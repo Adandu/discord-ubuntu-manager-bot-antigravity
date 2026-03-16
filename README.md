@@ -56,6 +56,18 @@ To use this bot, you must first create a Discord Application and get a Bot Token
     - `Read Message History`
 4.  **Copy the generated URL** and paste it into your browser to invite the bot to your server.
 
+### 4. Add the Bot to a Specific Channel
+To ensure the bot works correctly in a specific channel (especially private ones):
+1.  **Right-click** on the channel name in the channel list.
+2.  Select **"Edit Channel"**.
+3.  Go to the **"Permissions"** tab.
+4.  Under **"Roles/Members"**, click the **"+"** sign and find your bot (e.g., `Ubuntu Server Manager`).
+5.  Ensure the following permissions are enabled (checked Green):
+    - `View Channel`
+    - `Send Messages`
+    - `Use Slash Commands`
+6.  Click **"Save Changes"**.
+
 ---
 
 ## 📦 Setup & Deployment
