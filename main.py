@@ -21,7 +21,7 @@ class UbuntuManagerBot(discord.Client):
 
     async def setup_hook(self):
         if GUILD_ID:
-            guild = discord.Object(id=intents(GUILD_ID))
+            guild = discord.Object(id=int(GUILD_ID))
             self.tree.copy_global_to(guild=guild)
             await self.tree.sync(guild=guild)
         else:
