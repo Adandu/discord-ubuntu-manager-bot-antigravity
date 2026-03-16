@@ -30,27 +30,38 @@ Whoever wants to use this bot, they do so at their own risk. The authors and cre
 
 To use this bot, you must first create a Discord Application and get a Bot Token:
 
+### 1. Create the Bot & Get Token
 1.  **Go to the [Discord Developer Portal](https://discord.com/developers/applications).**
 2.  Click **"New Application"** and give it a name (e.g., `Ubuntu Server Manager`).
 3.  Go to the **"Bot"** tab on the left sidebar.
 4.  Click **"Reset Token"** (if needed) and **Copy the Token**. Save this for your `.env` file (`DISCORD_TOKEN`).
 5.  (Optional but recommended) Under **"Privileged Gateway Intents"**, enable **"Server Members Intent"** and **"Message Content Intent"**.
-6.  Go to the **"OAuth2"** tab, then **"URL Generator"**.
-7.  Select the following scopes:
+
+### 2. Get your Guild ID (Server ID)
+1.  Open your Discord client.
+2.  Go to **User Settings** (the gear icon at the bottom left).
+3.  Go to **Advanced** (under App Settings).
+4.  Enable **Developer Mode**.
+5.  Now, **right-click** on your server icon/name in the server list on the left.
+6.  Click **"Copy Server ID"**. Save this for your `.env` file (`GUILD_ID`).
+
+### 3. Invite the Bot
+1.  Go to the **"OAuth2"** tab, then **"URL Generator"**.
+2.  Select the following scopes:
     - `bot`
     - `applications.commands` (Crucial for Slash Commands)
-8.  Select the following permissions:
+3.  Select the following permissions:
     - `Send Messages`
     - `Use Slash Commands`
     - `Read Message History`
-9.  **Copy the generated URL** and paste it into your browser to invite the bot to your server.
+4.  **Copy the generated URL** and paste it into your browser to invite the bot to your server.
 
 ---
 
 ## 📦 Setup & Deployment
 
 ### 1. Requirements
-- A Discord Bot Token (from the steps above).
+- A Discord Bot Token & Guild ID (from the steps above).
 - Docker and Docker Compose installed.
 - Remote Ubuntu servers with SSH access.
 
@@ -61,7 +72,7 @@ cp .env.example .env
 ```
 Edit the `.env` file with your configuration:
 - `DISCORD_TOKEN`: Your bot token.
-- `GUILD_ID`: (Optional) Your Discord Server ID for faster command syncing.
+- `GUILD_ID`: Your Discord Server ID for command syncing.
 - `SERVERS_JSON`: A JSON array of your servers.
 - `SSH_KEY_...` or `SSH_PASS_...`: The actual secrets for each server.
 
