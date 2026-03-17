@@ -129,6 +129,11 @@ class SSHManager:
             
             return output
 
+        except Exception as e:
+            err_msg = f"SSH Error on '{alias}': {str(e)}"
+            logger.error(err_msg)
+            return err_msg
+
     def get_containers(self, alias: str) -> List[str]:
         """Fetch all container names from a server for autocomplete."""
         # Use --all to include stopped containers
