@@ -14,16 +14,17 @@ Whoever wants to use this bot, they do so at their own risk. The authors and cre
 ## 🚀 Features
 
 - **Multi-Server Support:** Manage an unlimited number of Ubuntu servers from a single bot.
+- **Easy Configuration:** Configure servers using simple numbered environment variables.
 - **Discord Autocomplete:** Seamlessly switch between servers in Discord using server aliases.
-- **SSH Support:** Supports both **SSH Keys** and **Password-based** authentication.
-- **Secure by Design:** No sensitive data is stored in the config; all secrets are passed via Environment Variables.
+- **Secure SSH Management:** Supports **SSH Keys** (via raw string or volume mount) and **Passwords**.
+- **Real-time Logging:** Logs commands and errors instantly to Docker logs (Unbuffered).
 - **Slash Commands:**
   - `/update`: Run `apt update` and `apt upgrade` remotely.
   - `/process`: Search for running processes by name.
   - `/service`: Start, Stop, Restart, or check the Status of any systemd service.
   - `/logs`: Tail the last N lines of any log file.
   - `/disk`: Check disk space usage (`df -h`).
-  - `/docker ps`: List all containers (with optional `--all` filter).
+  - `/docker ps`: List all containers (with optional `/docker` group enabled).
   - `/docker control`: Start, Stop, or Restart a specific container.
   - `/docker logs`: View the last N lines of container logs.
   - `/docker details`: View container image, internal IP, and port mappings.
@@ -60,18 +61,6 @@ To use this bot, you must first create a Discord Application and get a Bot Token
     - `Read Message History`
 4.  **Copy the generated URL** and paste it into your browser to invite the bot to your server.
 
-### 4. Add the Bot to a Specific Channel
-To ensure the bot works correctly in a specific channel (especially private ones):
-1.  **Right-click** on the channel name in the channel list.
-2.  Select **"Edit Channel"**.
-3.  Go to the **"Permissions"** tab.
-4.  Under **"Roles/Members"**, click the **"+"** sign and find your bot (e.g., `DiscoBunty`).
-5.  Ensure the following permissions are enabled (checked Green):
-    - `View Channel`
-    - `Send Messages`
-    - `Use Slash Commands`
-6.  Click **"Save Changes"**.
-
 ---
 
 ## 📦 Setup & Deployment
@@ -86,26 +75,33 @@ Clone the repository and copy the `.env.example` file to `.env`:
 ```bash
 cp .env.example .env
 ```
-Edit the `.env` file with your configuration:
+Edit the `.env` file with your configuration. Servers are defined using a numbered format (`_1`, `_2`, ...):
+
 - `DISCORD_TOKEN`: Your bot token.
 - `GUILD_ID`: Your Discord Server ID for command syncing.
-- `SERVERS_JSON`: A JSON array of your servers.
-- `SSH_KEY_...` or `SSH_PASS_...`: The actual secrets for each server.
+- `ENABLE_DOCKER`: Set to `true` to enable the `/docker` command group.
+- `DISCORD_UBUNTU_SERVER_ALIAS_N`: The nickname for server N.
+- `DISCORD_UBUNTU_SERVER_IP_N`: Hostname or IP.
+- `DISCORD_UBUNTU_SERVER_AUTH_METHOD_N`: `key` or `password`.
+- `DISCORD_UBUNTU_SERVER_KEY_N`: Raw SSH Key string OR path to key file (see below).
+- `DISCORD_UBUNTU_SERVER_PASSWORD_N`: Server password (if method is password).
 
-**Example `SERVERS_JSON`:**
-```json
-[
-  {
-    "alias": "web-01",
-    "host": "1.2.3.4",
-    "user": "ubuntu",
-    "auth_method": "key",
-    "secret_env": "SSH_KEY_WEB01"
-  }
-]
+### 3. SSH Key Management
+DiscoBunty supports two ways to handle SSH keys:
+
+#### A. Volume Bind Mount (Recommended)
+Place your `.key` files in a local folder named `./ssh_keys` and mount it in `docker-compose.yml`. Then point the variable to the path inside the container:
+```bash
+DISCORD_UBUNTU_SERVER_KEY_1=/app/ssh_keys/masterchief.key
 ```
 
-### 3. Run with Docker
+#### B. Raw Environment Variable
+Paste the entire content of your private key directly into the `.env` file (ensure you handle newlines correctly):
+```bash
+DISCORD_UBUNTU_SERVER_KEY_1="-----BEGIN RSA PRIVATE KEY-----\n...\n-----END RSA PRIVATE KEY-----"
+```
+
+### 4. Run with Docker
 ```bash
 docker-compose up -d
 ```
@@ -113,10 +109,10 @@ docker-compose up -d
 ---
 
 ## 🔒 Security Recommendations
-- **Dedicated User:** Create a dedicated user on your Ubuntu servers for the bot (e.g., `discord-bot`).
+- **Dedicated User:** Create a dedicated user on your Ubuntu servers for the bot (e.g., `discobunty`).
 - **Sudo Access:** To use `/update`, `/service`, or `/docker`, ensure the user has `sudo` permissions without a password.
   - **Edit sudoers:** `sudo visudo`
-  - **Add line:** `discord-bot ALL=(ALL) NOPASSWD: /usr/bin/apt-get, /usr/bin/systemctl, /usr/bin/tail, /usr/bin/df, /usr/bin/docker`
+  - **Add line:** `discobunty ALL=(ALL) NOPASSWD: /usr/bin/apt-get, /usr/bin/systemctl, /usr/bin/tail, /usr/bin/df, /usr/bin/docker`
 - **SSH Keys:** Always prefer SSH Keys over passwords for better security.
 
 ---
