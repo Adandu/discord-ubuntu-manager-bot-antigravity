@@ -67,6 +67,13 @@ async def container_autocomplete(
 async def ping(interaction: discord.Interaction):
     await interaction.response.send_message(f'Pong! {round(bot.latency * 1000)}ms')
 
+@bot.tree.command(name="stats", description="Show system statistics (CPU, RAM, Disk, etc.) for a server")
+@app_commands.autocomplete(server=server_autocomplete)
+async def stats(interaction: discord.Interaction, server: str):
+    await interaction.response.defer()
+    output = ssh_manager.get_system_stats(server)
+    await interaction.followup.send(f"**System Stats for `{server}`:**\n```\n{output[:1900]}\n```")
+
 # --- Docker Command Group ---
 docker_group = app_commands.Group(name="docker", description="Manage Docker containers")
 

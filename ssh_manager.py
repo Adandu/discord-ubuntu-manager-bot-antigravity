@@ -107,3 +107,21 @@ class SSHManager:
         )
         cmd = f"sudo docker inspect --format '{format_str}' {container_name}"
         return self.execute_command(alias, cmd)
+
+    def get_system_stats(self, alias: str) -> str:
+        """Fetch CPU, RAM, Disk, Load, and Uptime for the server."""
+        # Combine several commands to get a full snapshot
+        # CPU usage (100 - idle), Memory (Used/Total), Disk (Used/Total on /), Load Avg, Uptime
+        cmd = (
+            "echo \"[CPU Usage]\" && "
+            "grep 'cpu ' /proc/stat | awk '{usage=($2+$4)*100/($2+$4+$5)} END {printf \"%.1f%%\\n\", usage}' && "
+            "echo \"\\n[Memory Usage]\" && "
+            "free -h | awk '/^Mem:/ {print $3 \"/\" $2}' && "
+            "echo \"\\n[Disk Usage (root)]\" && "
+            "df -h / | awk 'NR==2 {print $3 \"/\" $2 \" (\" $5 \")\"}' && "
+            "echo \"\\n[Load Average]\" && "
+            "cat /proc/loadavg | awk '{print $1 \", \" $2 \", \" $3}' && "
+            "echo \"\\n[Uptime]\" && "
+            "uptime -p"
+        )
+        return self.execute_command(alias, cmd)
