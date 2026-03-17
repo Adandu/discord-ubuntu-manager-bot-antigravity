@@ -2,7 +2,10 @@ import os
 import json
 import paramiko
 import io
+import logging
 from typing import List, Dict, Optional
+
+logger = logging.getLogger('discord-ubuntu-manager.ssh')
 
 class SSHManager:
     def __init__(self):
@@ -14,7 +17,7 @@ class SSHManager:
         try:
             return json.loads(servers_raw)
         except json.JSONDecodeError:
-            print("Error: Invalid JSON in SERVERS_JSON environment variable.")
+            logger.error("Invalid JSON in SERVERS_JSON environment variable.")
             return []
 
     def get_server_aliases(self) -> List[str]:
@@ -30,9 +33,12 @@ class SSHManager:
 
     def execute_command(self, alias: str, command: str) -> str:
         """Connect to a server by alias and execute a command."""
+        logger.info(f"Executing command on '{alias}': {command}")
         config = self.get_server_by_alias(alias)
         if not config:
-            return f"Error: Server alias '{alias}' not found."
+            err_msg = f"Error: Server alias '{alias}' not found."
+            logger.error(err_msg)
+            return err_msg
 
         # Extract connection details
         host = config.get('host')
@@ -42,11 +48,15 @@ class SSHManager:
         secret_env = config.get('secret_env')
 
         if not secret_env:
-            return f"Error: 'secret_env' not defined for server '{alias}'."
+            err_msg = f"Error: 'secret_env' not defined for server '{alias}'."
+            logger.error(err_msg)
+            return err_msg
 
         secret_value = os.getenv(secret_env)
         if not secret_value:
-            return f"Error: Environment variable '{secret_env}' is empty or not found."
+            err_msg = f"Error: Environment variable '{secret_env}' is empty or not found."
+            logger.error(err_msg)
+            return err_msg
 
         # Setup SSH Client
         client = paramiko.SSHClient()
@@ -54,8 +64,7 @@ class SSHManager:
 
         try:
             if auth_method == 'key':
-                # Handle Private Key (assuming it's a string in the ENV var)
-                # We use io.StringIO to treat the string as a file object
+                # Handle Private Key
                 private_key = paramiko.RSAKey.from_private_key(io.StringIO(secret_value))
                 client.connect(hostname=host, port=port, username=user, pkey=private_key, timeout=10)
             else:
@@ -68,10 +77,16 @@ class SSHManager:
             error = stderr.read().decode('utf-8')
 
             client.close()
+            
+            if error:
+                logger.warning(f"Command on '{alias}' produced error output: {error.strip()}")
+            
             return output if output else error
 
         except Exception as e:
-            return f"SSH Error on '{alias}': {str(e)}"
+            err_msg = f"SSH Error on '{alias}': {str(e)}"
+            logger.error(err_msg)
+            return err_msg
 
     def get_containers(self, alias: str) -> List[str]:
         """Fetch all container names from a server for autocomplete."""

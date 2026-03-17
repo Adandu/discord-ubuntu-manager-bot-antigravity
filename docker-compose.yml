@@ -10,6 +10,8 @@ services:
       - DISCORD_TOKEN=${DISCORD_TOKEN}
       - GUILD_ID=${GUILD_ID}
       - SERVERS_JSON=${SERVERS_JSON}
+      - ENABLE_DOCKER=${ENABLE_DOCKER:-false}
+      - PYTHONUNBUFFERED=1
     logging:
       driver: "json-file"
       options:
