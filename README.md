@@ -18,6 +18,11 @@ Whoever wants to use this bot, they do so at their own risk. The authors and cre
 - **Discord Autocomplete:** Seamlessly switch between servers in Discord using server aliases.
 - **Secure SSH Management:** Supports **SSH Keys** (via raw string or volume mount) and **Passwords**.
 - **Real-time Logging:** Logs commands and errors instantly to Docker logs (Unbuffered).
+- **Security Hardened:** 
+  - **RBAC:** Restrict administrative commands to specific Discord roles.
+  - **Host Key Verification:** Strict SSH host key checking against `known_hosts`.
+  - **Input Sanitization:** All user inputs are sanitized to prevent command injection.
+  - **Log Whitelisting:** Restricted log viewing to `/var/log` and `/home`.
 - **Slash Commands:**
   - `/update`: Run `apt update` and `apt upgrade` remotely.
   - `/process`: Search for running processes by name.
@@ -80,6 +85,8 @@ Edit the `.env` file with your configuration. Servers are defined using a number
 - `DISCORD_TOKEN`: Your bot token.
 - `GUILD_ID`: Your Discord Server ID for command syncing.
 - `ENABLE_DOCKER`: Set to `true` to enable the `/docker` command group.
+- `ALLOWED_ROLES`: Comma-separated list of Discord role names allowed to use administrative commands (e.g., `Admin,DevOps`).
+- `KNOWN_HOSTS_FILE`: Path to the SSH `known_hosts` file inside the container (default: `/app/.ssh/known_hosts`).
 - `DISCORD_UBUNTU_SERVER_ALIAS_N`: The nickname for server N.
 - `DISCORD_UBUNTU_SERVER_IP_N`: Hostname or IP.
 - `DISCORD_UBUNTU_SERVER_AUTH_METHOD_N`: `key` or `password`.
