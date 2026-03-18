@@ -91,6 +91,10 @@ async def server_autocomplete(
     interaction: discord.Interaction,
     current: str,
 ) -> list[app_commands.Choice[str]]:
+    # 🛡️ RBAC: Don't leak server names to non-admins
+    if not check_permissions(interaction.user):
+        return []
+    
     aliases = ssh_manager.get_server_aliases()
     return [
         app_commands.Choice(name=alias, value=alias)
