@@ -215,6 +215,10 @@ if ENABLE_DOCKER:
         try:
             lines = min(max(1, lines), 100)
             output = await asyncio.to_thread(ssh_manager.get_container_logs, server, container, lines, search)
+            
+            if not output.strip() and "Error" not in output:
+                output = "No logs found or search term not found."
+
             header = f"**Logs for `{container}` on `{server}` (Last {lines} lines"
             if search:
                 header += f", Search: `{search}`"
@@ -276,8 +280,8 @@ async def process(interaction: discord.Interaction, server: str, search: str):
     try:
         # Sanitize search input
         safe_search = shlex.quote(search)
-        # Case-insensitive grep, excluding the grep process itself
-        cmd = f"ps aux | grep -i {safe_search} | grep -v grep"
+        # Case-insensitive grep, excluding the grep process itself. Use -e to prevent flag injection.
+        cmd = f"ps aux | grep -i -e {safe_search} | grep -v grep"
         output = await asyncio.to_thread(ssh_manager.execute_command, server, cmd)
         if not output.strip():
             output = f"No processes found matching '{search}'."
@@ -340,8 +344,8 @@ async def logs(interaction: discord.Interaction, server: str, path: str, lines: 
         
         if search:
             safe_search = shlex.quote(search)
-            # Chain grep after tail, but keep the symlink/realpath check
-            cmd = f"realpath {safe_path} | grep -qE {shlex.quote(allowed_pattern)} && sudo tail -n {lines} {safe_path} | grep -i {safe_search} | tail -n {lines}"
+            # Chain grep after tail, but keep the symlink/realpath check. Use -e to prevent flag injection.
+            cmd = f"realpath {safe_path} | grep -qE {shlex.quote(allowed_pattern)} && sudo tail -n {lines} {safe_path} | grep -i -e {safe_search} | tail -n {lines}"
         else:
             cmd = f"realpath {safe_path} | grep -qE {shlex.quote(allowed_pattern)} && sudo tail -n {lines} {safe_path}"
             

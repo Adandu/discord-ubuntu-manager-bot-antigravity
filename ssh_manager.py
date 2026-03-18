@@ -180,8 +180,8 @@ class SSHManager:
         
         if search:
             safe_search = shlex.quote(search)
-            # Use grep for search, -i for case-insensitive
-            cmd = f"sudo docker logs --tail {safe_lines} {safe_container} 2>&1 | grep -i {safe_search} | tail -n {safe_lines}"
+            # Use grep for search, -i for case-insensitive, -e to mark pattern explicitly (prevents flag injection)
+            cmd = f"sudo docker logs --tail {safe_lines} {safe_container} 2>&1 | grep -i -e {safe_search} | tail -n {safe_lines}"
         else:
             cmd = f"sudo docker logs --tail {safe_lines} {safe_container}"
             
