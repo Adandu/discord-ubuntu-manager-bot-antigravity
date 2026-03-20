@@ -17,10 +17,6 @@ known_hosts
 TODO.md
 README.md
 .env.example
-convert_logo.py
-logo.svg
-logo_hybrid.png
-logo_hybrid.svg
 upload_body.json
 
 # Python
