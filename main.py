@@ -168,7 +168,10 @@ if config["features"].get("enable_docker") == "true":
 # --- FastAPI WebUI Setup ---
 app = FastAPI(title="DiscoBunty Dashboard")
 app.add_middleware(SessionMiddleware, secret_key=os.getenv("SECRET_KEY", "default-insecure-key"))
-templates = Jinja2Templates(directory="DiscoBunty/templates")
+
+# Use absolute path for templates to ensure they are found in all environments (Docker vs Local)
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
 
 def is_authenticated(request: Request):
     web_pass = config["webui"].get("password")
