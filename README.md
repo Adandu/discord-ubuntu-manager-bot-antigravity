@@ -38,6 +38,27 @@ Whoever wants to use this bot, they do so at their own risk. The authors and cre
 
 ---
 
+## 🚀 Recent Release Notes (v0.7.0)
+
+- **UI Overhaul (Neon Architect):** 
+  - Major visual migration to the "Neon Architect" design system.
+  - New high-depth "Command Console" aesthetic with tactical sidebars, glass headers, and Bento grid components.
+  - Implemented a borderless surface hierarchy (`surface-container-low` through `highest`) with custom ambient glow aesthetics.
+  - Redesigned the login page as a frosted acrylic card with tactical focus states and "no-line" error panels.
+  - Integrated Material Symbols and refined typography (Manrope & Inter) for a high-end editorial feel.
+- **Security Hardening (Session & CSRF):** 
+  - Implemented a robust, session-bound CSRF token mechanism for all state-changing WebUI requests.
+  - Replaced the hardcoded login page with a secure `templates/login.html` supporting CSRF validation.
+  - Converted `/logout` from `GET` to `POST` to prevent CSRF-based forced logouts.
+  - Added `validate_csrf_form()` to handle CSRF tokens in traditional form submissions.
+  - Added security-hardening headers (HSTS, CSP, X-Frame-Options, X-Content-Type-Options) to all WebUI responses.
+- **Bug Fixes & Logic Improvements:**
+  - Refactored `save_config_ui` logic in `main.py` to ensure masked-value restoration and configuration synchronization are handled reliably.
+  - Fixed the log auto-scroll logic in `index.html` to correctly trigger only when the user is already near the bottom.
+  - Updated `saveCoreConfig` in `index.html` to correctly reference `config.webui.enabled` instead of a hardcoded value.
+  - Removed `master_secret` from the template context to prevent leaking the session signing key.
+  - Added HTML escaping to all server fields in the WebUI to prevent XSS.
+
 ## 🚀 Recent Release Notes (v0.6.0)
 
 - **Feature:** Implemented a new **Secure Web Control Panel** (accessible on port 8083 by default).
