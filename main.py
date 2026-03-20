@@ -328,13 +328,13 @@ async def add_security_headers(request: Request, call_next):
     response.headers["X-XSS-Protection"] = "1; mode=block"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
     response.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
-    # CSP: lock down resource origins; unsafe-inline required for inline scripts/styles in the template
+    # CSP: allow trusted CDNs for styling and functionality
     response.headers["Content-Security-Policy"] = (
         "default-src 'self'; "
-        "script-src 'self' 'unsafe-inline'; "
-        "style-src 'self' 'unsafe-inline'; "
-        "img-src 'self' data:; "
-        "font-src 'self'; "
+        "script-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com; "
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+        "img-src 'self' data: https://lh3.googleusercontent.com; "
+        "font-src 'self' https://fonts.gstatic.com; "
         "connect-src 'self'; "
         "frame-ancestors 'none';"
     )

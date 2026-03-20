@@ -38,6 +38,10 @@ Whoever wants to use this bot, they do so at their own risk. The authors and cre
 
 ---
 
+## 🚀 Recent Release Notes (v0.7.1)
+
+- **Fix:** Corrected `Content-Security-Policy` (CSP) headers in `main.py` to allow trusted CDNs (Tailwind CSS, Google Fonts). This resolves the issue where the WebUI would render without styles on some browsers.
+
 ## 🚀 Recent Release Notes (v0.7.0)
 
 - **UI Overhaul (Neon Architect):** 
