@@ -164,18 +164,102 @@ async def stats(interaction: discord.Interaction, server: str):
     output = await asyncio.to_thread(ssh_manager.get_system_stats, server)
     await interaction.followup.send(f"**System Stats for `{server}`:**\n```\n{output[:MAX_MSG_LEN]}\n```")
 
-# Docker Commands
+@bot.tree.command(name="disk", description="Check disk space on a server")
+@is_admin()
+@app_commands.autocomplete(server=server_autocomplete)
+async def disk(interaction: discord.Interaction, server: str):
+    await interaction.response.defer()
+    output = await asyncio.to_thread(ssh_manager.execute_command, server, "df -h")
+    await interaction.followup.send(f"**Disk Space on `{server}`:**\n```\n{output[:MAX_MSG_LEN]}\n```")
+
+@bot.tree.command(name="update", description="Check and install updates on a server")
+@is_admin()
+@app_commands.autocomplete(server=server_autocomplete)
+async def update(interaction: discord.Interaction, server: str):
+    await interaction.response.defer()
+    output = await asyncio.to_thread(ssh_manager.execute_command, server, "sudo apt-get update && sudo apt-get upgrade -y")
+    await interaction.followup.send(f"**Update Result for `{server}`:**\n```\n{output[:MAX_MSG_LEN]}\n```")
+
+@bot.tree.command(name="process", description="Search for running processes on a server")
+@is_admin()
+@app_commands.autocomplete(server=server_autocomplete)
+async def process(interaction: discord.Interaction, server: str, search: str):
+    await interaction.response.defer()
+    safe_search = shlex.quote(search)
+    cmd = f"ps aux | grep -i -e {safe_search} | grep -v grep"
+    output = await asyncio.to_thread(ssh_manager.execute_command, server, cmd)
+    await interaction.followup.send(f"**Processes on `{server}` (Search: '{search}'):**\n```\n{output[:MAX_MSG_LEN]}\n```")
+
+@bot.tree.command(name="service", description="Control a systemd service on a server")
+@is_admin()
+@app_commands.autocomplete(server=server_autocomplete)
+@app_commands.choices(action=[
+    app_commands.Choice(name="status", value="status"),
+    app_commands.Choice(name="start", value="start"),
+    app_commands.Choice(name="stop", value="stop"),
+    app_commands.Choice(name="restart", value="restart"),
+])
+async def service(interaction: discord.Interaction, server: str, action: str, name: str):
+    await interaction.response.defer()
+    cmd = f"sudo systemctl {shlex.quote(action)} {shlex.quote(name)}"
+    output = await asyncio.to_thread(ssh_manager.execute_command, server, cmd)
+    await interaction.followup.send(f"**Service `{name}` {action} on `{server}`**:\n```\n{output[:MAX_MSG_LEN]}\n```")
+
+@bot.tree.command(name="logs", description="View recent system log entries on a server")
+@is_admin()
+@app_commands.autocomplete(server=server_autocomplete, path=log_autocomplete)
+async def system_logs(interaction: discord.Interaction, server: str, path: str, lines: int = 20, search: str = None):
+    await interaction.response.defer()
+    if not any(path.startswith(root) for root in ALLOWED_LOG_ROOTS) or ".." in path:
+        await interaction.followup.send(f"❌ Access denied to path: `{path}`", ephemeral=True)
+        return
+    lines = min(max(1, lines), 100)
+    cmd = f"sudo tail -n {lines} {shlex.quote(path)}"
+    if search:
+        cmd += f" | grep -i -e {shlex.quote(search)}"
+    output = await asyncio.to_thread(ssh_manager.execute_command, server, cmd)
+    await interaction.followup.send(f"**Last {lines} lines of `{path}` on `{server}`:**\n```\n{output[:MAX_MSG_LEN]}\n```")
+
+# --- Docker Group ---
 if config["features"].get("enable_docker") == "true":
     docker_group = app_commands.Group(name="docker", description="Manage Docker containers")
     
-    @docker_group.command(name="ps", description="List containers")
+    @docker_group.command(name="ps", description="List containers on a server")
     @app_commands.autocomplete(server=server_autocomplete)
-    async def docker_ps(interaction: discord.Interaction, server: str):
+    async def docker_ps(interaction: discord.Interaction, server: str, all: bool = True):
         await interaction.response.defer()
-        output = await asyncio.to_thread(ssh_manager.execute_command, server, "sudo docker ps -a")
+        cmd = "sudo docker ps -a" if all else "sudo docker ps"
+        output = await asyncio.to_thread(ssh_manager.execute_command, server, cmd)
         await interaction.followup.send(f"**Containers on `{server}`:**\n```\n{output[:MAX_MSG_LEN]}\n```")
+
+    @docker_group.command(name="control", description="Start, stop, or restart a container")
+    @app_commands.autocomplete(server=server_autocomplete, container=container_autocomplete)
+    @app_commands.choices(action=[
+        app_commands.Choice(name="start", value="start"),
+        app_commands.Choice(name="stop", value="stop"),
+        app_commands.Choice(name="restart", value="restart"),
+    ])
+    async def docker_control(interaction: discord.Interaction, server: str, action: str, container: str):
+        await interaction.response.defer()
+        output = await asyncio.to_thread(ssh_manager.container_action, server, container, action)
+        await interaction.followup.send(f"**Action `{action}` on container `{container}` (`{server}`):**\n```\n{output[:MAX_MSG_LEN]}\n```")
+
+    @docker_group.command(name="logs", description="View container logs")
+    @app_commands.autocomplete(server=server_autocomplete, container=container_autocomplete)
+    async def docker_logs(interaction: discord.Interaction, server: str, container: str, lines: int = 50, search: str = None):
+        await interaction.response.defer()
+        lines = min(max(1, lines), 100)
+        output = await asyncio.to_thread(ssh_manager.get_container_logs, server, container, lines, search)
+        header = f"**Logs for `{container}` on `{server}` (Last {lines} lines):**"
+        await interaction.followup.send(f"{header}\n```\n{output[:MAX_MSG_LEN]}\n```")
+
+    @docker_group.command(name="details", description="View container image, IP, and ports")
+    @app_commands.autocomplete(server=server_autocomplete, container=container_autocomplete)
+    async def docker_details(interaction: discord.Interaction, server: str, container: str):
+        await interaction.response.defer()
+        output = await asyncio.to_thread(ssh_manager.get_container_details, server, container)
+        await interaction.followup.send(f"**Details for `{container}` on `{server}`:**\n```\n{output[:MAX_MSG_LEN]}\n```")
     
-    # ... (Other docker commands simplified for brevity)
     bot.tree.add_command(docker_group)
 
 # --- FastAPI WebUI Setup ---
