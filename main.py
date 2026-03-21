@@ -441,31 +441,29 @@ async def test_server(request: Request, server_data: dict):
     trust_host = server_data.get("trust_host", False)
     alias = server_data.get("alias")
     host = server_data.get("host")
-    port = int(server_data.get("port", 22))
+    
+    # Port validation to prevent 500 error
+    try:
+        port = int(server_data.get("port", 22))
+    except (ValueError, TypeError):
+        return JSONResponse(status_code=400, content={"success": False, "message": "Invalid port number."})
 
-    # Configuration Guard: Connection tests must match a configured server to prevent SSRF
+    # Configuration Guard: prevent SSRF by ensuring existing aliases use their configured host/port
     configured_servers = config_manager.get_server_config()
-    orig = None
-    if alias:
-        orig = next((s for s in configured_servers if s["alias"] == alias), None)
+    orig = next((s for s in configured_servers if s["alias"] == alias), None)
     
-    if not orig:
-        # If no alias, try to match by host and port
-        orig = next((s for s in configured_servers if s.get("host") == host and int(s.get("port", 22)) == port), None)
-
-    if not orig:
-        return JSONResponse(
-            status_code=403,
-            content={"success": False, "message": "Security Error: Connection tests are only allowed for configured servers."}
-        )
-    
-    # SECURITY: Always use the host and port from the OFFICIAL config, not user input
-    server_data["host"] = orig.get("host")
-    server_data["port"] = orig.get("port", 22)
-
-    # If password/key is masked (********), use the original from config
-    if server_data.get("password") == "********": server_data["password"] = orig.get("password")
-    if server_data.get("key") == "********": server_data["key"] = orig.get("key")
+    if orig:
+        # SSRF Protection: For existing aliases, always use the authoritative host/port
+        server_data["host"] = orig.get("host")
+        server_data["port"] = orig.get("port", 22)
+        
+        # Restore masked credentials if necessary
+        if server_data.get("password") == "********": server_data["password"] = orig.get("password")
+        if server_data.get("key") == "********": server_data["key"] = orig.get("key")
+    else:
+        # This is a NEW server (or an unsaved edit). 
+        # We allow the test so the user can verify credentials before saving.
+        pass
 
     success, message, fingerprint = await asyncio.to_thread(ssh_manager.test_server_connection, server_data, trust_host=trust_host)
     return {"success": success, "message": message, "fingerprint": fingerprint}

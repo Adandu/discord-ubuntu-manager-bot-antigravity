@@ -49,9 +49,6 @@ class SSHManager:
                 self.fingerprint = None
             def missing_host_key(self, client, hostname, key):
                 self.key = key
-                # Capture SHA256 fingerprint
-                fp_bytes = key.get_fingerprint()
-                self.fingerprint = f"SHA256:{io.BytesIO(fp_bytes).read().hex()}" # Placeholder, better way below
                 # Standard OpenSSH SHA256 format
                 import base64
                 import hashlib
