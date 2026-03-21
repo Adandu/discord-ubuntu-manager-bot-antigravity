@@ -162,27 +162,24 @@ class SSHManager:
             user = config.get('user', 'root')
             password = config.get('password')
             
-            # Synology/DSM Path Fix: resolve absolute paths for common commands
-            # We prefix the command with a path export to ensure we find binaries
-            path_env = "export PATH=$PATH:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin && "
-            full_command = path_env + command
+            # Synology/DSM Path Fix: use 'env' to set PATH without sh -c expansion risks
+            path_list = "/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
 
             if user != 'root' and command.startswith('sudo ') and password:
-                # Use -S to read password from stdin
-                # Note: We must insert the PATH fix AFTER the sudo if we want sudo to find the binary,
-                # or ensure the PATH is inherited. The simplest way is to use 'sudo -E' or provide the full path.
-                # Here we'll wrap the command to ensure path visibility.
-                command_to_run = command.replace('sudo ', f'sudo -S -E sh -c "{path_env}', 1) + '"'
+                # Rebuild command using: sudo -S -E env PATH=$PATH:... command
+                cmd_body = command[5:] # remove 'sudo '
+                command_to_run = f'sudo -S -E env PATH="$PATH:{path_list}" {cmd_body}'
                 stdin, stdout, stderr = client.exec_command(command_to_run, timeout=60)
                 stdin.write(password + '\n')
                 stdin.flush()
             else:
-                stdin, stdout, stderr = client.exec_command(full_command, timeout=60)
+                command_to_run = f'env PATH="$PATH:{path_list}" {command}'
+                stdin, stdout, stderr = client.exec_command(command_to_run, timeout=60)
 
             output = stdout.read().decode('utf-8')
             error = stderr.read().decode('utf-8')
 
-            # Clean up sudo password prompt from error output if present
+            # Clean up sudo password prompt from error output
             if "[sudo] password for" in error or "Password:" in error:
                 lines = error.splitlines()
                 error = "\n".join([l for l in lines if "[sudo] password for" not in l and "Password:" != l.strip()]).strip()
