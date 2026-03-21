@@ -150,7 +150,7 @@ class SSHManager:
             return False, f"Error closing connection: {str(e)}", None
 
     def execute_command(self, alias: str, command: str) -> str:
-        """Connect to a server by alias and execute a command with sudo support."""
+        """Connect to a server by alias and execute a command with sudo and path resolution."""
         config = self.get_server_by_alias(alias)
         client, err, _ = self._get_ssh_client(config)
         if err:
@@ -162,22 +162,30 @@ class SSHManager:
             user = config.get('user', 'root')
             password = config.get('password')
             
+            # Synology/DSM Path Fix: resolve absolute paths for common commands
+            # We prefix the command with a path export to ensure we find binaries
+            path_env = "export PATH=$PATH:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin && "
+            full_command = path_env + command
+
             if user != 'root' and command.startswith('sudo ') and password:
                 # Use -S to read password from stdin
-                command = command.replace('sudo ', f'sudo -S ', 1)
-                stdin, stdout, stderr = client.exec_command(command, timeout=60)
+                # Note: We must insert the PATH fix AFTER the sudo if we want sudo to find the binary,
+                # or ensure the PATH is inherited. The simplest way is to use 'sudo -E' or provide the full path.
+                # Here we'll wrap the command to ensure path visibility.
+                command_to_run = command.replace('sudo ', f'sudo -S -E sh -c "{path_env}', 1) + '"'
+                stdin, stdout, stderr = client.exec_command(command_to_run, timeout=60)
                 stdin.write(password + '\n')
                 stdin.flush()
             else:
-                stdin, stdout, stderr = client.exec_command(command, timeout=60)
+                stdin, stdout, stderr = client.exec_command(full_command, timeout=60)
 
             output = stdout.read().decode('utf-8')
             error = stderr.read().decode('utf-8')
 
             # Clean up sudo password prompt from error output if present
-            if "[sudo] password for" in error:
+            if "[sudo] password for" in error or "Password:" in error:
                 lines = error.splitlines()
-                error = "\n".join([l for l in lines if "[sudo] password for" not in l]).strip()
+                error = "\n".join([l for l in lines if "[sudo] password for" not in l and "Password:" != l.strip()]).strip()
 
             if error and output:
                 return f"{output}\n[Error Output]\n{error}"
