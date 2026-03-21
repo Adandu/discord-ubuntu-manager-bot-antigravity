@@ -120,35 +120,44 @@
 <body class="bg-surface text-on-surface selection:bg-primary-container selection:text-on-primary-container overflow-hidden">
 
 <!-- ═══════════════ SIDEBAR ═══════════════ -->
-<aside class="h-screen w-64 fixed left-0 top-0 bg-surface-container-low flex flex-col p-4 z-50">
-    <div class="mb-8 px-2 flex items-center gap-3">
-        <div class="w-10 h-10 rounded-full bg-gradient-to-br from-primary-container to-primary flex items-center justify-center text-on-primary font-bold shadow-lg">
-            <span class="material-symbols-outlined text-xl">hub</span>
+<!-- Backdrop for mobile -->
+<div id="sidebarBackdrop" class="fixed inset-0 bg-background/60 backdrop-blur-sm z-40 hidden md:hidden transition-opacity duration-300" onclick="toggleSidebar()"></div>
+
+<aside id="sidebar" class="h-screen w-64 fixed left-0 top-0 bg-surface-container-low flex flex-col p-4 z-50 -translate-x-full md:translate-x-0 transition-transform duration-300 ease-in-out border-r border-outline-variant/20">
+    <div class="mb-8 px-2 flex items-center justify-between">
+        <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-full bg-gradient-to-br from-primary-container to-primary flex items-center justify-center text-on-primary font-bold shadow-lg">
+                <span class="material-symbols-outlined text-xl">hub</span>
+            </div>
+            <div>
+                <h1 class="text-xl font-bold text-primary leading-none" style="font-family:'Manrope',sans-serif;">DiscoBunty</h1>
+                <p class="text-[10px] text-secondary uppercase tracking-widest mt-1 opacity-70">Control Panel</p>
+            </div>
         </div>
-        <div>
-            <h1 class="text-xl font-bold text-primary leading-none" style="font-family:'Manrope',sans-serif;">DiscoBunty</h1>
-            <p class="text-[10px] text-secondary uppercase tracking-widest mt-1 opacity-70">Control Panel</p>
-        </div>
+        <!-- Mobile close button -->
+        <button onclick="toggleSidebar()" class="md:hidden p-2 text-on-surface-variant hover:text-primary transition-colors">
+            <span class="material-symbols-outlined">close</span>
+        </button>
     </div>
 
     <nav class="flex-1 space-y-1">
-        <a href="#settings" class="nav-link flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-container-highest hover:scale-[1.01] transition-all rounded-xl" data-section="settings">
+        <a href="#settings" class="nav-link flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-container-highest hover:scale-[1.01] transition-all rounded-xl" data-section="settings" onclick="if(window.innerWidth < 768) toggleSidebar()">
             <span class="material-symbols-outlined">settings</span>
             <span class="text-sm font-medium">Core Settings</span>
         </a>
-        <a href="#discord" class="nav-link flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-container-highest hover:scale-[1.01] transition-all rounded-xl" data-section="discord">
+        <a href="#discord" class="nav-link flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-container-highest hover:scale-[1.01] transition-all rounded-xl" data-section="discord" onclick="if(window.innerWidth < 768) toggleSidebar()">
             <span class="material-symbols-outlined">tag</span>
             <span class="text-sm font-medium">Discord</span>
         </a>
-        <a href="#features" class="nav-link flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-container-highest hover:scale-[1.01] transition-all rounded-xl" data-section="features">
+        <a href="#features" class="nav-link flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-container-highest hover:scale-[1.01] transition-all rounded-xl" data-section="features" onclick="if(window.innerWidth < 768) toggleSidebar()">
             <span class="material-symbols-outlined">widgets</span>
             <span class="text-sm font-medium">Features</span>
         </a>
-        <a href="#servers" class="nav-link flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-container-highest hover:scale-[1.01] transition-all rounded-xl" data-section="servers">
+        <a href="#servers" class="nav-link flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-container-highest hover:scale-[1.01] transition-all rounded-xl" data-section="servers" onclick="if(window.innerWidth < 768) toggleSidebar()">
             <span class="material-symbols-outlined">dns</span>
             <span class="text-sm font-medium">Servers</span>
         </a>
-        <a href="#logs" class="nav-link flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-container-highest hover:scale-[1.01] transition-all rounded-xl" data-section="logs">
+        <a href="#logs" class="nav-link flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-container-highest hover:scale-[1.01] transition-all rounded-xl" data-section="logs" onclick="if(window.innerWidth < 768) toggleSidebar()">
             <span class="material-symbols-outlined">terminal</span>
             <span class="text-sm font-medium">Logs</span>
         </a>
@@ -166,83 +175,88 @@
 </aside>
 
 <!-- ═══════════════ HEADER ═══════════════ -->
-<header class="fixed top-0 right-0 left-64 h-16 bg-surface/80 backdrop-blur-xl flex justify-between items-center px-8 z-40 shadow-[0_12px_32px_rgba(88,101,242,0.12)]">
-    <div class="flex items-center gap-4">
-        <h2 class="text-base font-black tracking-tight text-on-surface uppercase" style="font-family:'Manrope',sans-serif;">Bot Dashboard</h2>
+<header class="fixed top-0 right-0 left-0 md:left-64 h-16 bg-surface/80 backdrop-blur-xl flex justify-between items-center px-4 md:px-8 z-40 shadow-[0_12px_32px_rgba(88,101,242,0.12)] border-b border-outline-variant/10">
+    <div class="flex items-center gap-2 md:gap-4">
+        <!-- Hamburger Menu -->
+        <button onclick="toggleSidebar()" class="md:hidden p-2 text-on-surface-variant hover:text-primary transition-colors">
+            <span class="material-symbols-outlined">menu</span>
+        </button>
+        <h2 class="text-xs md:text-base font-black tracking-tight text-on-surface uppercase" style="font-family:'Manrope',sans-serif;">Bot Dashboard</h2>
         <div class="h-4 w-px bg-outline-variant opacity-30"></div>
-        <span id="saveStatus" class="text-xs text-on-surface-variant font-medium opacity-0 transition-opacity duration-300">Saved</span>
+        <span id="saveStatus" class="text-[10px] md:text-xs text-on-surface-variant font-medium opacity-0 transition-opacity duration-300">Saved</span>
     </div>
     <div class="flex items-center gap-3">
-        <button onclick="saveFullConfig()" class="px-6 py-2 bg-gradient-to-br from-primary-container to-primary text-on-primary text-sm font-bold rounded-full hover:scale-105 active:scale-95 transition-all shadow-[0_4px_16px_rgba(88,101,242,0.3)]">
-            Save Changes
+        <button onclick="saveFullConfig()" class="px-4 md:px-6 py-1.5 md:py-2 bg-gradient-to-br from-primary-container to-primary text-on-primary text-xs md:text-sm font-bold rounded-full hover:scale-105 active:scale-95 transition-all shadow-[0_4px_16px_rgba(88,101,242,0.3)]">
+            <span class="hidden xs:inline">Save Changes</span>
+            <span class="xs:hidden">Save</span>
         </button>
     </div>
 </header>
 
 <!-- ═══════════════ MAIN CONTENT ═══════════════ -->
-<main class="ml-64 pt-16 h-screen overflow-y-auto bg-surface">
-<div class="p-10 max-w-7xl mx-auto space-y-10">
+<main class="ml-0 md:ml-64 pt-16 h-screen overflow-y-auto bg-surface">
+<div class="p-4 md:p-10 max-w-7xl mx-auto space-y-6 md:space-y-10">
 
     <!-- ── Bot Status Hero ── -->
-    <section id="overview" class="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        <div class="lg:col-span-8 bg-surface-container-low rounded-3xl p-8 flex items-center gap-6 relative overflow-hidden group">
+    <section id="overview" class="grid grid-cols-1 lg:grid-cols-12 gap-4 md:gap-6">
+        <div class="lg:col-span-8 bg-surface-container-low rounded-2xl md:rounded-3xl p-6 md:p-8 flex flex-col sm:flex-row items-center gap-6 relative overflow-hidden group">
             <div class="absolute -right-20 -top-20 w-64 h-64 bg-primary-container/10 blur-[100px] rounded-full group-hover:bg-primary-container/20 transition-all duration-700 pointer-events-none"></div>
             <div class="relative flex-shrink-0">
-                <div class="w-20 h-20 rounded-2xl bg-gradient-to-br from-primary-container to-primary flex items-center justify-center shadow-[0_8px_24px_rgba(88,101,242,0.3)]">
-                    <span class="material-symbols-outlined text-4xl text-on-primary">smart_toy</span>
+                <div class="w-16 h-16 md:w-20 md:h-20 rounded-2xl bg-gradient-to-br from-primary-container to-primary flex items-center justify-center shadow-[0_8px_24px_rgba(88,101,242,0.3)]">
+                    <span class="material-symbols-outlined text-3xl md:text-4xl text-on-primary">smart_toy</span>
                 </div>
-                <div class="absolute -bottom-1 -right-1 w-5 h-5 bg-[#23a55a] border-2 border-surface-container-low rounded-full animate-pulse"></div>
+                <div class="absolute -bottom-1 -right-1 w-4 h-4 md:w-5 md:h-5 bg-[#23a55a] border-2 border-surface-container-low rounded-full animate-pulse"></div>
             </div>
-            <div class="flex-1 min-w-0">
-                <div class="flex items-center gap-3 mb-1 flex-wrap">
-                    <h2 class="text-3xl font-extrabold tracking-tight text-on-surface" style="font-family:'Manrope',sans-serif;">DiscoBunty</h2>
+            <div class="flex-1 min-w-0 text-center sm:text-left">
+                <div class="flex items-center justify-center sm:justify-start gap-3 mb-1 flex-wrap">
+                    <h2 class="text-2xl md:text-3xl font-extrabold tracking-tight text-on-surface" style="font-family:'Manrope',sans-serif;">DiscoBunty</h2>
                     <span class="bg-primary-container/20 text-primary text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-tighter">Active</span>
                 </div>
-                <p class="text-on-surface-variant text-sm leading-relaxed max-w-md">Multi-server Discord management bot with Docker integration, SSH control, and automated workflows.</p>
-                <div class="flex gap-6 mt-4">
+                <p class="text-on-surface-variant text-xs md:text-sm leading-relaxed max-w-md">Multi-server Discord management bot with Docker integration, SSH control, and automated workflows.</p>
+                <div class="flex justify-center sm:justify-start gap-6 mt-4">
                     <div class="flex flex-col">
                         <span class="text-[10px] uppercase font-bold text-primary tracking-widest">Servers</span>
-                        <span class="text-xl font-bold" id="serverCountDisplay" style="font-family:'Manrope',sans-serif;">0</span>
+                        <span class="text-lg md:text-xl font-bold" id="serverCountDisplay" style="font-family:'Manrope',sans-serif;">0</span>
                     </div>
                     <div class="flex flex-col">
                         <span class="text-[10px] uppercase font-bold text-secondary tracking-widest">Status</span>
-                        <span class="text-xl font-bold text-[#4ade80]" style="font-family:'Manrope',sans-serif;">Online</span>
+                        <span class="text-lg md:text-xl font-bold text-[#4ade80]" style="font-family:'Manrope',sans-serif;">Online</span>
                     </div>
                 </div>
             </div>
         </div>
-        <div class="lg:col-span-4 bg-surface-container-high rounded-3xl p-8 flex flex-col justify-between" style="border-bottom: 4px solid #c33900;">
+        <div class="lg:col-span-4 bg-surface-container-high rounded-2xl md:rounded-3xl p-6 md:p-8 flex flex-col justify-between" style="border-bottom: 4px solid #c33900;">
             <h3 class="text-base font-bold mb-4" style="font-family:'Manrope',sans-serif;">Quick Actions</h3>
-            <div class="space-y-3 flex-1">
+            <div class="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-1 gap-2 flex-1">
                 <button onclick="document.getElementById('settings').scrollIntoView({behavior:'smooth'})" class="w-full py-2.5 px-4 bg-surface-container-highest rounded-xl text-on-surface text-sm font-medium text-left flex items-center gap-3 hover:bg-surface-bright transition-colors">
                     <span class="material-symbols-outlined text-primary text-base">tune</span>
-                    Configure Settings
+                    <span class="truncate">Settings</span>
                 </button>
                 <button onclick="openServerModal()" class="w-full py-2.5 px-4 bg-surface-container-highest rounded-xl text-on-surface text-sm font-medium text-left flex items-center gap-3 hover:bg-surface-bright transition-colors">
                     <span class="material-symbols-outlined text-secondary text-base">add_circle</span>
-                    Add Server
+                    <span class="truncate">Add Server</span>
                 </button>
                 <button onclick="document.getElementById('logs').scrollIntoView({behavior:'smooth'})" class="w-full py-2.5 px-4 bg-surface-container-highest rounded-xl text-on-surface text-sm font-medium text-left flex items-center gap-3 hover:bg-surface-bright transition-colors">
                     <span class="material-symbols-outlined text-outline text-base">receipt_long</span>
-                    View Logs
+                    <span class="truncate">View Logs</span>
                 </button>
             </div>
         </div>
     </section>
 
     <!-- ── Core Configuration ── -->
-    <section id="settings" class="bg-surface-container-low rounded-3xl p-10">
-        <div class="mb-8 flex items-baseline justify-between">
+    <section id="settings" class="bg-surface-container-low rounded-2xl md:rounded-3xl p-6 md:p-10">
+        <div class="mb-8 flex items-center justify-between gap-4">
             <div>
-                <h2 class="text-2xl font-black tracking-tight mb-1" style="font-family:'Manrope',sans-serif;">Core Configuration</h2>
-                <p class="text-on-surface-variant text-sm">Manage bot credentials and environment parameters</p>
+                <h2 class="text-xl md:text-2xl font-black tracking-tight mb-1" style="font-family:'Manrope',sans-serif;">Core Configuration</h2>
+                <p class="text-on-surface-variant text-xs md:text-sm">Manage bot credentials and environment parameters</p>
             </div>
-            <button onclick="saveCoreConfig()" class="px-5 py-2 bg-gradient-to-br from-primary-container to-primary text-on-primary text-sm font-bold rounded-full hover:scale-105 active:scale-95 transition-all">
-                Save Core
+            <button onclick="saveCoreConfig()" class="flex-shrink-0 px-4 md:px-5 py-2 bg-gradient-to-br from-primary-container to-primary text-on-primary text-xs md:text-sm font-bold rounded-full hover:scale-105 active:scale-95 transition-all">
+                Save
             </button>
         </div>
 
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-10">
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-10">
 
             <!-- Discord Settings -->
             <div id="discord" class="space-y-6">
@@ -472,7 +486,26 @@
     const config = {{ config | tojson }};
     const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
 
-    /* ── Utils ── */
+    /* ── Mobile Sidebar Toggle ── */
+    function toggleSidebar() {
+        const sidebar = document.getElementById('sidebar');
+        const backdrop = document.getElementById('sidebarBackdrop');
+        const isOpen = !sidebar.classList.contains('-translate-x-full');
+
+        if (isOpen) {
+            sidebar.classList.add('-translate-x-full');
+            backdrop.classList.add('hidden');
+            backdrop.classList.remove('opacity-100');
+            document.body.classList.remove('modal-open');
+        } else {
+            sidebar.classList.remove('-translate-x-full');
+            backdrop.classList.remove('hidden');
+            setTimeout(() => backdrop.classList.add('opacity-100'), 10);
+            document.body.classList.add('modal-open');
+        }
+    }
+
+    /* ── UI Handlers ── */
     function escapeHtml(str) {
         return String(str)
             .replace(/&/g, '&amp;')
