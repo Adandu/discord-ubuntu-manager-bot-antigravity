@@ -560,7 +560,7 @@ async def main():
     if config["discord"].get("token"):
         tasks.append(bot.start(config["discord"]["token"]))
     if config["webui"].get("enabled") == "true":
-        uv_config = uvicorn.Config(app, host="0.0.0.0", port=8000, log_level="info", proxy_headers=True, forwarded_allow_ips="*")
+        uv_config = uvicorn.Config(app, host="127.0.0.1", port=8000, log_level="info", proxy_headers=True, forwarded_allow_ips="*")
         tasks.append(uvicorn.Server(uv_config).serve())
     if tasks: await asyncio.gather(*tasks, return_exceptions=True)
 
