@@ -107,3 +107,10 @@ class AppState:
     def save_config(self, config: AppConfig) -> None:
         self.config_manager.save_config(config)
         self.refresh_runtime()
+
+    def read_audit_entries(self, limit: int = 200) -> list[str]:
+        if not self.audit_log_path.exists():
+            return []
+        with self.audit_log_path.open("r", encoding="utf-8") as handle:
+            lines = handle.readlines()
+        return [line.rstrip("\n") for line in lines[-limit:]]

@@ -198,6 +198,47 @@ class SSHManager:
         finally:
             client.close()
 
+    def _execute_command_on_config(self, config: Dict, command: str) -> str:
+        alias = config.get("alias", config.get("host", "unknown"))
+        client, err, _ = self._get_ssh_client(config)
+        if err:
+            logger.error(f"SSH Connection Error on '{alias}': {err}")
+            return f"SSH Error: {err}"
+
+        try:
+            user = config.get('user', 'root')
+            password = config.get('password')
+            path_list = "/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+
+            if user != 'root' and command.startswith('sudo ') and password:
+                cmd_body = command[5:]
+                command_to_run = f'sudo -S -E env PATH="$PATH:{path_list}" {cmd_body}'
+                stdin, stdout, stderr = client.exec_command(command_to_run, timeout=60)
+                stdin.write(password + '\n')
+                stdin.flush()
+            else:
+                command_to_run = f'env PATH="$PATH:{path_list}" {command}'
+                stdin, stdout, stderr = client.exec_command(command_to_run, timeout=60)
+
+            output = stdout.read().decode('utf-8')
+            error = stderr.read().decode('utf-8')
+
+            if "[sudo] password for" in error or "Password:" in error:
+                lines = error.splitlines()
+                error = "\n".join([line for line in lines if "[sudo] password for" not in line and "Password:" != line.strip()]).strip()
+
+            if error and output:
+                return f"{output}\n[Error Output]\n{error}"
+            if error:
+                return error
+            return output
+        except Exception as e:
+            err_msg = f"SSH Execution Error on '{alias}': {str(e)}"
+            logger.error(err_msg)
+            return err_msg
+        finally:
+            client.close()
+
     def get_containers(self, alias: str) -> List[str]:
         """Fetch all container names from a server for autocomplete."""
         cmd = "sudo docker ps -a --format '{{.Names}}'"
@@ -208,6 +249,98 @@ class SSHManager:
             
         containers = [name.strip() for name in output.split('\n') if name.strip()]
         return containers
+
+    def execute_probe(self, config: Dict, command: str) -> str:
+        return self._execute_command_on_config(config, command)
+
+    def get_observability(self, alias: str, backup_path: str = "", include_docker: bool = False) -> Dict[str, str]:
+        metrics = {
+            "alias": alias,
+            "cpu": "n/a",
+            "ram": "n/a",
+            "disk": "n/a",
+            "uptime": "n/a",
+            "docker_count": "n/a",
+            "last_backup_age": "n/a",
+            "status": "offline",
+        }
+        config = self.get_server_by_alias(alias)
+        if not config:
+            metrics["error"] = "Server not configured"
+            return metrics
+
+        command = (
+            "printf 'cpu='; awk '/^cpu / {usage=($2+$4)*100/($2+$4+$5); printf \"%.1f%%\", usage}' /proc/stat; printf '\\n' && "
+            "printf 'ram='; free -h | awk '/^Mem:/ {print $3 \"/\" $2}'; printf '\\n' && "
+            "printf 'disk='; df -h / | awk 'NR==2 {print $3 \"/\" $2 \" (\" $5 \")\"}'; printf '\\n' && "
+            "printf 'uptime='; uptime -p; printf '\\n'"
+        )
+        if include_docker:
+            command += " && printf 'docker_count='; if command -v docker >/dev/null 2>&1; then sudo docker ps -q | wc -l | tr -d ' '; else printf 'n/a'; fi; printf '\\n'"
+        if backup_path:
+            safe_path = shlex.quote(backup_path)
+            command += (
+                f" && printf 'last_backup_age='; "
+                f"if [ -f {safe_path} ]; then "
+                f"  latest=$(stat -c %Y {safe_path}); "
+                f"elif [ -d {safe_path} ]; then "
+                f"  latest=$(find {safe_path} -type f -printf '%T@\\n' 2>/dev/null | sort -nr | head -n 1 | cut -d. -f1); "
+                f"else latest=''; fi; "
+                f"if [ -n \"$latest\" ]; then now=$(date +%s); printf '%ss' $((now-latest)); else printf 'n/a'; fi; printf '\\n'"
+            )
+
+        output = self.execute_command(alias, command)
+        if "SSH Error" in output or "SSH Execution Error" in output:
+            metrics["error"] = output
+            return metrics
+
+        metrics["status"] = "online"
+        for line in output.splitlines():
+            if "=" not in line:
+                continue
+            key, value = line.split("=", 1)
+            if key in metrics:
+                metrics[key] = value.strip() or "n/a"
+        return metrics
+
+    def check_server_capabilities(self, alias: str, backup_path: str = "", include_docker: bool = False) -> Dict[str, str]:
+        status = {
+            "alias": alias,
+            "ssh": "fail",
+            "sudo": "fail",
+            "docker": "n/a",
+            "known_host": "ok",
+            "backup": "n/a",
+            "message": "",
+        }
+        config = self.get_server_by_alias(alias)
+        if not config:
+            status["message"] = "Server not configured"
+            return status
+
+        ok, message, fingerprint = self.test_server_connection(config)
+        if not ok:
+            status["known_host"] = "missing" if fingerprint else "error"
+            status["message"] = message
+            return status
+        status["ssh"] = "ok"
+
+        sudo_output = self.execute_command(alias, "sudo -n true")
+        if "SSH Error" not in sudo_output and "not allowed" not in sudo_output.lower() and "password is required" not in sudo_output.lower():
+            status["sudo"] = "ok"
+        else:
+            status["message"] = sudo_output
+
+        if include_docker:
+            docker_output = self.execute_command(alias, "sudo docker ps -q | wc -l")
+            status["docker"] = "ok" if "SSH Error" not in docker_output and "command not found" not in docker_output.lower() else "fail"
+
+        if backup_path:
+            safe_path = shlex.quote(backup_path)
+            backup_output = self.execute_command(alias, f"test -e {safe_path} && echo ok || echo missing")
+            status["backup"] = "ok" if backup_output.strip() == "ok" else "missing"
+
+        return status
 
     def container_action(self, alias: str, container_name: str, action: str) -> str:
         """Perform action (start, stop, restart) on a specific container."""

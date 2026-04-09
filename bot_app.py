@@ -11,13 +11,31 @@ from app_state import ALLOWED_LOG_ROOTS, MAX_MSG_LEN, AppState
 from auth_utils import verify_password
 
 
-def check_permissions(state: AppState, user) -> bool:
-    allowed_roles_str = state.config.discord.allowed_roles
+def _role_names(user) -> list[str]:
+    return [role.name for role in getattr(user, "roles", [])]
+
+
+def _matches_roles(user_roles: list[str], allowed_roles_str: str) -> bool:
     allowed_roles = [role.strip() for role in allowed_roles_str.split(",") if role.strip()]
-    if not allowed_roles or not hasattr(user, "roles"):
+    if not allowed_roles:
         return False
-    user_roles = [role.name for role in user.roles]
     return any(role in allowed_roles for role in user_roles)
+
+
+def check_permissions(state: AppState, user, server_alias: str | None = None) -> bool:
+    if not hasattr(user, "roles"):
+        return False
+    user_roles = _role_names(user)
+    if not _matches_roles(user_roles, state.config.discord.allowed_roles):
+        return False
+
+    if not server_alias:
+        return True
+
+    server = next((candidate for candidate in state.config.servers if candidate.alias == server_alias), None)
+    if not server or not server.allowed_roles.strip():
+        return True
+    return _matches_roles(user_roles, server.allowed_roles)
 
 
 def is_admin(state: AppState):
@@ -92,17 +110,39 @@ def create_bot(state: AppState) -> DiscoBunty:
         state.logger.info("Docker integration: %s", "Enabled" if state.config.features.enable_docker else "Disabled")
         state.logger.info("------")
 
+    @bot.tree.error
+    async def on_app_command_error(interaction: discord.Interaction, error: app_commands.AppCommandError) -> None:
+        state.logger.exception("Discord app command error: %s", error, exc_info=error)
+        if isinstance(error, app_commands.CheckFailure):
+            message = "❌ You do not have permission to use that command or access that server."
+        elif isinstance(error, app_commands.CommandInvokeError) and error.original:
+            message = f"❌ Command failed: {error.original}"
+        else:
+            message = "❌ Command failed. Check DiscoBunty logs for details."
+
+        if interaction.response.is_done():
+            await interaction.followup.send(message[:1900], ephemeral=True)
+        else:
+            await interaction.response.send_message(message[:1900], ephemeral=True)
+
+    def ensure_server_access(interaction: discord.Interaction, server: str) -> None:
+        if not check_permissions(state, interaction.user, server):
+            raise app_commands.CheckFailure(f"User lacks access to server {server}")
+
     async def server_autocomplete(interaction: discord.Interaction, current: str) -> list[app_commands.Choice[str]]:
         if not check_permissions(state, interaction.user):
             return []
-        aliases = sorted(state.ssh_manager.get_server_aliases(), key=lambda value: value.lower())
+        aliases = sorted(
+            [alias for alias in state.ssh_manager.get_server_aliases() if check_permissions(state, interaction.user, alias)],
+            key=lambda value: value.lower(),
+        )
         return [app_commands.Choice(name=alias, value=alias) for alias in aliases if current.lower() in alias.lower()]
 
     async def container_autocomplete(interaction: discord.Interaction, current: str) -> list[app_commands.Choice[str]]:
         if not check_permissions(state, interaction.user):
             return []
         server = interaction.namespace.server
-        if not server:
+        if not server or not check_permissions(state, interaction.user, server):
             return []
         try:
             containers = await asyncio.to_thread(state.ssh_manager.get_containers, server)
@@ -118,7 +158,7 @@ def create_bot(state: AppState) -> DiscoBunty:
         if not check_permissions(state, interaction.user):
             return []
         server = interaction.namespace.server
-        if not server:
+        if not server or not check_permissions(state, interaction.user, server):
             return []
         try:
             logs = await asyncio.to_thread(state.ssh_manager.get_log_files, server)
@@ -139,6 +179,7 @@ def create_bot(state: AppState) -> DiscoBunty:
     @app_commands.autocomplete(server=server_autocomplete)
     @app_commands.choices(action=[app_commands.Choice(name="reboot", value="reboot"), app_commands.Choice(name="shutdown", value="shutdown")])
     async def server_power(interaction: discord.Interaction, server: str, action: str) -> None:
+        ensure_server_access(interaction, server)
         if not state.config.features.power_control_enabled:
             await interaction.response.send_message("❌ Power control is currently disabled.", ephemeral=True)
             return
@@ -154,6 +195,7 @@ def create_bot(state: AppState) -> DiscoBunty:
     @is_admin(state)
     @app_commands.autocomplete(server=server_autocomplete)
     async def stats(interaction: discord.Interaction, server: str) -> None:
+        ensure_server_access(interaction, server)
         await interaction.response.defer()
         output = await asyncio.to_thread(state.ssh_manager.get_system_stats, server)
         await interaction.followup.send(f"**System Stats for `{server}`:**\n```\n{output[:MAX_MSG_LEN]}\n```")
@@ -162,6 +204,7 @@ def create_bot(state: AppState) -> DiscoBunty:
     @is_admin(state)
     @app_commands.autocomplete(server=server_autocomplete)
     async def disk(interaction: discord.Interaction, server: str) -> None:
+        ensure_server_access(interaction, server)
         await interaction.response.defer()
         output = await asyncio.to_thread(state.ssh_manager.execute_command, server, "df -h")
         await interaction.followup.send(f"**Disk Space on `{server}`:**\n```\n{output[:MAX_MSG_LEN]}\n```")
@@ -170,6 +213,7 @@ def create_bot(state: AppState) -> DiscoBunty:
     @is_admin(state)
     @app_commands.autocomplete(server=server_autocomplete)
     async def update(interaction: discord.Interaction, server: str) -> None:
+        ensure_server_access(interaction, server)
         await interaction.response.defer()
         output = await asyncio.to_thread(state.ssh_manager.execute_command, server, "sudo apt-get update && sudo apt-get upgrade -y")
         await interaction.followup.send(f"**Update Result for `{server}`:**\n```\n{output[:MAX_MSG_LEN]}\n```")
@@ -178,6 +222,7 @@ def create_bot(state: AppState) -> DiscoBunty:
     @is_admin(state)
     @app_commands.autocomplete(server=server_autocomplete)
     async def process(interaction: discord.Interaction, server: str, search: str) -> None:
+        ensure_server_access(interaction, server)
         await interaction.response.defer()
         cmd = f"ps aux | grep -i -e {shlex.quote(search)} | grep -v grep"
         output = await asyncio.to_thread(state.ssh_manager.execute_command, server, cmd)
@@ -193,6 +238,7 @@ def create_bot(state: AppState) -> DiscoBunty:
         app_commands.Choice(name="restart", value="restart"),
     ])
     async def service(interaction: discord.Interaction, server: str, action: str, name: str) -> None:
+        ensure_server_access(interaction, server)
         await interaction.response.defer()
         state.audit_log(interaction.user.id, interaction.user.name, "service", f"Action: {action} | Service: {name} | Server: {server}")
         cmd = f"sudo systemctl {shlex.quote(action)} {shlex.quote(name)}"
@@ -203,6 +249,7 @@ def create_bot(state: AppState) -> DiscoBunty:
     @is_admin(state)
     @app_commands.autocomplete(server=server_autocomplete, path=log_autocomplete)
     async def system_logs(interaction: discord.Interaction, server: str, path: str, lines: int = 20, search: str | None = None) -> None:
+        ensure_server_access(interaction, server)
         await interaction.response.defer()
         real_path = await asyncio.to_thread(state.ssh_manager.resolve_remote_path, server, path)
         normalized_path = os.path.normpath(real_path).replace("\\", "/")
@@ -227,6 +274,7 @@ def create_bot(state: AppState) -> DiscoBunty:
         @app_commands.check(lambda interaction: check_permissions(state, interaction.user))
         @app_commands.autocomplete(server=server_autocomplete)
         async def docker_ps(interaction: discord.Interaction, server: str, all: bool = True) -> None:
+            ensure_server_access(interaction, server)
             await interaction.response.defer()
             cmd = "sudo docker ps -a" if all else "sudo docker ps"
             output = await asyncio.to_thread(state.ssh_manager.execute_command, server, cmd)
@@ -241,6 +289,7 @@ def create_bot(state: AppState) -> DiscoBunty:
             app_commands.Choice(name="restart", value="restart"),
         ])
         async def docker_control(interaction: discord.Interaction, server: str, action: str, container: str) -> None:
+            ensure_server_access(interaction, server)
             await interaction.response.defer()
             state.audit_log(
                 interaction.user.id,
@@ -255,6 +304,7 @@ def create_bot(state: AppState) -> DiscoBunty:
         @app_commands.check(lambda interaction: check_permissions(state, interaction.user))
         @app_commands.autocomplete(server=server_autocomplete, container=container_autocomplete)
         async def docker_logs(interaction: discord.Interaction, server: str, container: str, lines: int = 50, search: str | None = None) -> None:
+            ensure_server_access(interaction, server)
             await interaction.response.defer()
             lines = min(max(1, lines), 100)
             output = await asyncio.to_thread(state.ssh_manager.get_container_logs, server, container, lines, search)
@@ -264,6 +314,7 @@ def create_bot(state: AppState) -> DiscoBunty:
         @app_commands.check(lambda interaction: check_permissions(state, interaction.user))
         @app_commands.autocomplete(server=server_autocomplete, container=container_autocomplete)
         async def docker_details(interaction: discord.Interaction, server: str, container: str) -> None:
+            ensure_server_access(interaction, server)
             await interaction.response.defer()
             output = await asyncio.to_thread(state.ssh_manager.get_container_details, server, container)
             await interaction.followup.send(f"**Details for `{container}` on `{server}`:**\n```\n{output[:MAX_MSG_LEN]}\n```")

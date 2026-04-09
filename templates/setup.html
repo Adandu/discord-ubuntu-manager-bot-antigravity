@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html class="dark" lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DiscoBunty Setup</title>
+    <script src="/static/js/tailwind.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet"/>
+    <style>
+        body { font-family: 'Inter', sans-serif; background: #111318; color: #e2e2e8; }
+        h1,h2,h3 { font-family: 'Manrope', sans-serif; }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center px-4">
+    <div class="w-full max-w-md rounded-[28px] border border-[#454655] bg-[#191c20] p-8">
+        <h1 class="text-3xl font-extrabold">First-Run Setup</h1>
+        <p class="mt-3 text-sm text-[#c6c5d7]">Create the initial WebUI password. After this step, DiscoBunty will use the regular login page.</p>
+        {% if error %}
+        <div class="mt-5 rounded-[18px] bg-[#93000a]/30 px-4 py-3 text-sm text-[#ffb4ab]">
+            {% if error == 'short' %}Password must be at least 8 characters.
+            {% elif error == 'mismatch' %}Passwords do not match.
+            {% else %}Setup failed.{% endif %}
+        </div>
+        {% endif %}
+        <form method="post" action="/setup" class="mt-6 space-y-4">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <label class="block">
+                <span class="mb-2 block text-xs uppercase tracking-[0.18em] text-[#8f8fa0]">WebUI Password</span>
+                <input type="password" name="password" class="w-full rounded-[18px] border border-[#454655] bg-[#0c0e13] px-4 py-3" required>
+            </label>
+            <label class="block">
+                <span class="mb-2 block text-xs uppercase tracking-[0.18em] text-[#8f8fa0]">Confirm Password</span>
+                <input type="password" name="confirm_password" class="w-full rounded-[18px] border border-[#454655] bg-[#0c0e13] px-4 py-3" required>
+            </label>
+            <button type="submit" class="w-full rounded-full bg-[#5865f2] px-4 py-3 font-semibold text-white">Complete Setup</button>
+        </form>
+    </div>
+</body>
+</html>

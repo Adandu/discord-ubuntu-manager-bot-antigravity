@@ -4,17 +4,19 @@ import asyncio
 import hmac
 import os
 import secrets
+from datetime import datetime, timezone
 from pathlib import Path
 
-from fastapi import FastAPI, Form, HTTPException, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
+from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
 
 from app_state import AppState
+from auth_utils import hash_password
 from auth_utils import verify_password
-from models import AppConfig, SaveConfigRequest, TestServerRequest
+from models import AppConfig, RestoreConfigResponse, SaveConfigRequest, SetupRequest, TestServerRequest
 
 
 def create_web_app(state: AppState) -> FastAPI:
@@ -41,6 +43,9 @@ def create_web_app(state: AppState) -> FastAPI:
 
     def is_authenticated(request: Request) -> bool:
         return bool(state.config.webui.password) and request.session.get("authenticated") is True
+
+    def setup_required() -> bool:
+        return not bool(state.config.webui.password)
 
     def get_csrf_token(request: Request) -> str:
         token = request.session.get("csrf_token")
@@ -81,6 +86,8 @@ def create_web_app(state: AppState) -> FastAPI:
 
     @app.get("/", response_class=HTMLResponse)
     async def dashboard(request: Request):
+        if setup_required():
+            return RedirectResponse(url="/setup")
         if not is_authenticated(request):
             return RedirectResponse(url="/login")
 
@@ -97,6 +104,8 @@ def create_web_app(state: AppState) -> FastAPI:
 
     @app.get("/login", response_class=HTMLResponse)
     async def login_page(request: Request):
+        if setup_required():
+            return RedirectResponse(url="/setup")
         return templates.TemplateResponse(
             request,
             "login.html",
@@ -108,6 +117,8 @@ def create_web_app(state: AppState) -> FastAPI:
 
     @app.post("/login")
     async def login(request: Request, password: str = Form(...), csrf_token: str = Form(...)):
+        if setup_required():
+            return RedirectResponse(url="/setup", status_code=303)
         validate_csrf_form(request, csrf_token)
         client_ip = get_client_ip(request)
         if not state.login_limiter.is_allowed(client_ip):
@@ -130,6 +141,37 @@ def create_web_app(state: AppState) -> FastAPI:
         validate_csrf_form(request, csrf_token)
         request.session.clear()
         return RedirectResponse(url="/login", status_code=303)
+
+    @app.get("/setup", response_class=HTMLResponse)
+    async def setup_page(request: Request):
+        if not setup_required():
+            return RedirectResponse(url="/" if is_authenticated(request) else "/login")
+        return templates.TemplateResponse(
+            request,
+            "setup.html",
+            {
+                "csrf_token": get_csrf_token(request),
+                "error": request.query_params.get("error"),
+            },
+        )
+
+    @app.post("/setup")
+    async def setup_submit(request: Request, password: str = Form(...), confirm_password: str = Form(...), csrf_token: str = Form(...)):
+        if not setup_required():
+            return RedirectResponse(url="/" if is_authenticated(request) else "/login", status_code=303)
+        validate_csrf_form(request, csrf_token)
+        if len(password) < 8:
+            return RedirectResponse(url="/setup?error=short", status_code=303)
+        if password != confirm_password:
+            return RedirectResponse(url="/setup?error=mismatch", status_code=303)
+
+        config = state.config.model_copy(deep=True)
+        config.webui.password = hash_password(password)
+        state.save_config(config)
+        request.session.clear()
+        request.session["authenticated"] = True
+        request.session["csrf_token"] = secrets.token_hex(32)
+        return RedirectResponse(url="/", status_code=303)
 
     @app.post("/api/test-server")
     async def test_server(request: Request, server_data: TestServerRequest):
@@ -201,6 +243,66 @@ def create_web_app(state: AppState) -> FastAPI:
         if not is_authenticated(request):
             raise HTTPException(status_code=401)
         return {"logs": "\n".join(list(state.log_buffer))}
+
+    @app.get("/api/audit")
+    async def get_audit_logs(request: Request):
+        if not is_authenticated(request):
+            raise HTTPException(status_code=401)
+        return {"entries": state.read_audit_entries()}
+
+    @app.get("/api/backup/export")
+    async def export_backup(request: Request):
+        if not is_authenticated(request):
+            raise HTTPException(status_code=401)
+        raw = state.config_manager.export_raw_config()
+        filename = f"discobunty-backup-{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')}.json"
+        return Response(
+            content=raw,
+            media_type="application/json",
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        )
+
+    @app.post("/api/backup/restore", response_model=RestoreConfigResponse)
+    async def restore_backup(request: Request, backup_file: UploadFile = File(...)):
+        if not is_authenticated(request):
+            raise HTTPException(status_code=401)
+        validate_csrf(request)
+        raw = await backup_file.read()
+        restored = state.config_manager.import_raw_config(raw)
+        state.refresh_runtime()
+        return RestoreConfigResponse(status="success", restored_servers=len(restored.servers))
+
+    @app.get("/api/servers/check")
+    async def bulk_server_check(request: Request):
+        if not is_authenticated(request):
+            raise HTTPException(status_code=401)
+
+        async def check_one(server):
+            return await asyncio.to_thread(
+                state.ssh_manager.check_server_capabilities,
+                server.alias,
+                server.backup_path,
+                state.config.features.enable_docker,
+            )
+
+        results = await asyncio.gather(*(check_one(server) for server in state.config.servers))
+        return {"results": results}
+
+    @app.get("/api/servers/overview")
+    async def server_overview(request: Request):
+        if not is_authenticated(request):
+            raise HTTPException(status_code=401)
+
+        async def overview_one(server):
+            return await asyncio.to_thread(
+                state.ssh_manager.get_observability,
+                server.alias,
+                server.backup_path,
+                state.config.features.enable_docker,
+            )
+
+        results = await asyncio.gather(*(overview_one(server) for server in state.config.servers))
+        return {"results": results}
 
     @app.get("/health")
     async def health():

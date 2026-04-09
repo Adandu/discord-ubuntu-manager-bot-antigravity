@@ -50,6 +50,8 @@ class ServerSettings(BaseModel):
     auth_method: Literal["key", "password"] = "key"
     password: str = ""
     key: str = ""
+    allowed_roles: str = ""
+    backup_path: str = ""
     original_alias: str | None = Field(default=None, alias="_original_alias")
 
 
@@ -71,3 +73,12 @@ class TestServerRequest(ServerSettings):
 
 class SaveConfigRequest(AppConfig):
     pass
+
+
+class SetupRequest(BaseModel):
+    password: str = Field(min_length=8)
+
+
+class RestoreConfigResponse(BaseModel):
+    status: str
+    restored_servers: int

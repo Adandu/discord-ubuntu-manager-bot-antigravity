@@ -186,3 +186,15 @@ class ConfigManager:
 
     def get_server_config(self) -> list[dict]:
         return [server.model_dump(by_alias=True) for server in self.config.servers]
+
+    def export_raw_config(self) -> bytes:
+        if not self.config_path.exists():
+            self.save_config(self.config)
+        return self.config_path.read_bytes()
+
+    def import_raw_config(self, raw_content: bytes) -> AppConfig:
+        payload = json.loads(raw_content.decode("utf-8"))
+        runtime_config = self._process_config(copy.deepcopy(payload), decrypt=True)
+        typed_config = AppConfig.model_validate(runtime_config)
+        self.save_config(typed_config)
+        return self.config

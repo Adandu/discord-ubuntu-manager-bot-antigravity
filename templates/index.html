@@ -1,826 +1,176 @@
 <!DOCTYPE html>
 <html class="dark" lang="en">
 <head>
-    <meta charset="utf-8"/>
-    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
-    <meta name="csrf-token" content="{{ csrf_token }}">
-    <title>DiscoBunty Dashboard</title>
-    <link rel="icon" type="image/svg+xml" href="/static/logo.svg">
-    <link rel="shortcut icon" href="/static/logo.svg">
-    <script src="/static/js/tailwind.min.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet"/>
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" crossorigin="anonymous" />
-    <script id="tailwind-config">
-        tailwind.config = {
-            darkMode: "class",
-            theme: {
-                extend: {
-                    colors: {
-                        "on-tertiary-fixed-variant": "#743500",
-                        "surface-variant": "#33353a",
-                        "on-primary-fixed": "#000569",
-                        "on-secondary-fixed": "#3a0b00",
-                        "error": "#ffb4ab",
-                        "tertiary": "#ffb689",
-                        "tertiary-fixed": "#ffdbc8",
-                        "on-surface": "#e2e2e8",
-                        "error-container": "#93000a",
-                        "surface-tint": "#bec2ff",
-                        "inverse-on-surface": "#2e3035",
-                        "tertiary-container": "#bb5a00",
-                        "on-primary-container": "#fffdff",
-                        "on-error": "#690005",
-                        "outline": "#8f8fa0",
-                        "surface-dim": "#111318",
-                        "primary-fixed": "#e0e0ff",
-                        "primary-fixed-dim": "#bec2ff",
-                        "surface-container-low": "#191c20",
-                        "primary-container": "#5865f2",
-                        "secondary-fixed": "#ffdbd0",
-                        "primary": "#bec2ff",
-                        "on-tertiary": "#512300",
-                        "surface-container-lowest": "#0c0e13",
-                        "background": "#111318",
-                        "outline-variant": "#454655",
-                        "on-primary-fixed-variant": "#222fc2",
-                        "secondary-fixed-dim": "#ffb59e",
-                        "surface-bright": "#37393e",
-                        "secondary": "#ffb59e",
-                        "inverse-surface": "#e2e2e8",
-                        "surface-container": "#1d2024",
-                        "on-tertiary-fixed": "#311300",
-                        "secondary-container": "#c33900",
-                        "surface-container-highest": "#33353a",
-                        "on-error-container": "#ffdad6",
-                        "on-secondary-container": "#ffe7e0",
-                        "tertiary-fixed-dim": "#ffb689",
-                        "on-primary": "#000da4",
-                        "on-surface-variant": "#c6c5d7",
-                        "on-secondary": "#5e1700",
-                        "on-tertiary-container": "#fffdff",
-                        "surface-container-high": "#282a2f",
-                        "surface": "#111318",
-                        "on-background": "#e2e2e8",
-                        "inverse-primary": "#3f4cda",
-                        "on-secondary-fixed-variant": "#852400"
-                    },
-                    fontFamily: {
-                        "headline": ["Manrope"],
-                        "body": ["Inter"],
-                        "label": ["Inter"]
-                    },
-                    borderRadius: {"DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem"},
-                },
-            },
-        }
-    </script>
-    <style>
-        .material-symbols-outlined {
-            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
-            vertical-align: middle;
-        }
-        body { font-family: 'Inter', sans-serif; }
-        h1, h2, h3 { font-family: 'Manrope', sans-serif; }
-        ::-webkit-scrollbar { width: 6px; }
-        ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: #33353a; border-radius: 10px; }
-        /* Terminal log styling */
-        #logs-container {
-            background-color: #0c0e13;
-            color: #4ade80;
-            font-family: 'Courier New', Courier, monospace;
-            font-size: 0.82rem;
-            white-space: pre-wrap;
-            word-break: break-all;
-        }
-        /* Nav active state */
-        .nav-active {
-            background-color: #33353a;
-            color: #bec2ff;
-            font-weight: 700;
-        }
-        /* Toggle switch (Neon Architect) */
-        .na-toggle { position: relative; display: inline-flex; align-items: center; cursor: pointer; }
-        .na-toggle input { position: absolute; opacity: 0; width: 0; height: 0; }
-        .na-track {
-            width: 44px; height: 24px; background: #33353a; border-radius: 999px;
-            transition: background 0.2s; position: relative; display: block;
-        }
-        .na-thumb {
-            position: absolute; top: 3px; left: 3px;
-            width: 18px; height: 18px; border-radius: 50%;
-            background: #c6c5d7; transition: transform 0.2s, background 0.2s;
-        }
-        .na-toggle input:checked ~ .na-track { background: #5865f2; }
-        .na-toggle input:checked ~ .na-track .na-thumb { transform: translateX(20px); background: #fff; }
-        /* Modal backdrop */
-        .modal-open { overflow: hidden; }
-    </style>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="csrf-token" content="{{ csrf_token }}">
+  <title>DiscoBunty Dashboard</title>
+  <script src="/static/js/tailwind.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet"/>
+  <style>
+    body { font-family: 'Inter', sans-serif; background: #111318; color: #e2e2e8; }
+    h1,h2,h3,h4 { font-family: 'Manrope', sans-serif; }
+    .panel { background: #191c20; border: 1px solid #454655; border-radius: 24px; }
+    .field { width: 100%; border: 1px solid #454655; background: #0c0e13; border-radius: 18px; padding: 12px 16px; }
+    .btn { border-radius: 9999px; padding: 10px 16px; font-weight: 700; }
+    .btn-primary { background: #5865f2; color: #fff; }
+    .btn-muted { background: #33353a; color: #e2e2e8; }
+    .btn-danger { background: rgba(147,0,10,.3); color: #ffb4ab; }
+    .mono { font-family: Consolas, monospace; }
+    .terminal { background: #0c0e13; color: #4ade80; white-space: pre-wrap; font-family: Consolas, monospace; }
+  </style>
 </head>
-<body class="bg-surface text-on-surface selection:bg-primary-container selection:text-on-primary-container overflow-hidden">
-
-<!-- ═══════════════ SIDEBAR ═══════════════ -->
-<!-- Backdrop for mobile -->
-<div id="sidebarBackdrop" class="fixed inset-0 bg-background/60 backdrop-blur-sm z-40 hidden md:hidden transition-opacity duration-300" onclick="toggleSidebar()"></div>
-
-<aside id="sidebar" class="h-screen w-64 fixed left-0 top-0 bg-surface-container-low flex flex-col p-4 z-50 -translate-x-full md:translate-x-0 transition-transform duration-300 ease-in-out border-r border-outline-variant/20">
-    <div class="mb-8 px-2 flex items-center justify-between">
-        <div class="flex items-center gap-3">
-            <div class="w-10 h-10 rounded-full bg-gradient-to-br from-primary-container to-primary flex items-center justify-center text-on-primary font-bold shadow-lg">
-                <span class="material-symbols-outlined text-xl">hub</span>
-            </div>
-            <div>
-                <h1 class="text-xl font-bold text-primary leading-none" style="font-family:'Manrope',sans-serif;">DiscoBunty</h1>
-                <p class="text-[10px] text-secondary uppercase tracking-widest mt-1 opacity-70">Control Panel</p>
-            </div>
+<body>
+  <div class="mx-auto max-w-7xl space-y-6 px-4 py-6 md:px-8">
+    <header class="panel p-6">
+      <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+        <div>
+          <h1 class="text-3xl font-extrabold">DiscoBunty Control Deck</h1>
+          <p class="mt-2 text-sm text-[#c6c5d7]">Scoped server access, backup tools, audit visibility, bulk checks, and read-only observability cards.</p>
         </div>
-        <!-- Mobile close button -->
-        <button onclick="toggleSidebar()" class="md:hidden p-2 text-on-surface-variant hover:text-primary transition-colors">
-            <span class="material-symbols-outlined">close</span>
-        </button>
-    </div>
-
-    <nav class="flex-1 space-y-1">
-        <a href="#settings" class="nav-link flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-container-highest hover:scale-[1.01] transition-all rounded-xl" data-section="settings" onclick="if(window.innerWidth < 768) toggleSidebar()">
-            <span class="material-symbols-outlined">settings</span>
-            <span class="text-sm font-medium">Core Settings</span>
-        </a>
-        <a href="#discord" class="nav-link flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-container-highest hover:scale-[1.01] transition-all rounded-xl" data-section="discord" onclick="if(window.innerWidth < 768) toggleSidebar()">
-            <span class="material-symbols-outlined">tag</span>
-            <span class="text-sm font-medium">Discord</span>
-        </a>
-        <a href="#features" class="nav-link flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-container-highest hover:scale-[1.01] transition-all rounded-xl" data-section="features" onclick="if(window.innerWidth < 768) toggleSidebar()">
-            <span class="material-symbols-outlined">widgets</span>
-            <span class="text-sm font-medium">Features</span>
-        </a>
-        <a href="#servers" class="nav-link flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-container-highest hover:scale-[1.01] transition-all rounded-xl" data-section="servers" onclick="if(window.innerWidth < 768) toggleSidebar()">
-            <span class="material-symbols-outlined">dns</span>
-            <span class="text-sm font-medium">Servers</span>
-        </a>
-        <a href="#logs" class="nav-link flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-container-highest hover:scale-[1.01] transition-all rounded-xl" data-section="logs" onclick="if(window.innerWidth < 768) toggleSidebar()">
-            <span class="material-symbols-outlined">terminal</span>
-            <span class="text-sm font-medium">Logs</span>
-        </a>
-    </nav>
-
-    <div class="mt-auto pt-4">
-        <form method="post" action="/logout">
+        <div class="flex flex-wrap gap-2">
+          <button class="btn btn-muted" onclick="runServerChecks()">Test All Servers</button>
+          <button class="btn btn-muted" onclick="refreshOverview()">Refresh Metrics</button>
+          <button class="btn btn-muted" onclick="downloadBackup()">Export Backup</button>
+          <label class="btn btn-primary cursor-pointer">Restore Backup<input id="restoreInput" class="hidden" type="file" accept="application/json" onchange="restoreBackup(event)"></label>
+          <form method="post" action="/logout">
             <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-            <button type="submit" class="w-full py-3 rounded-xl bg-surface-container-highest text-on-surface-variant font-semibold flex items-center justify-center gap-2 hover:bg-error-container hover:text-error transition-all active:scale-95 text-sm">
-                <span class="material-symbols-outlined text-base">logout</span>
-                <span>Logout</span>
-            </button>
-        </form>
-    </div>
-</aside>
-
-<!-- ═══════════════ HEADER ═══════════════ -->
-<header class="fixed top-0 right-0 left-0 md:left-64 h-16 bg-surface/80 backdrop-blur-xl flex justify-between items-center px-4 md:px-8 z-40 shadow-[0_12px_32px_rgba(88,101,242,0.12)] border-b border-outline-variant/10">
-    <div class="flex items-center gap-2 md:gap-4">
-        <!-- Hamburger Menu -->
-        <button onclick="toggleSidebar()" class="md:hidden p-2 text-on-surface-variant hover:text-primary transition-colors">
-            <span class="material-symbols-outlined">menu</span>
-        </button>
-        <h2 class="text-xs md:text-base font-black tracking-tight text-on-surface uppercase" style="font-family:'Manrope',sans-serif;">Bot Dashboard</h2>
-        <div class="h-4 w-px bg-outline-variant opacity-30"></div>
-        <span id="saveStatus" class="text-[10px] md:text-xs text-on-surface-variant font-medium opacity-0 transition-opacity duration-300">Saved</span>
-    </div>
-    <div class="flex items-center gap-3">
-        <button onclick="saveFullConfig()" class="px-4 md:px-6 py-1.5 md:py-2 bg-gradient-to-br from-primary-container to-primary text-on-primary text-xs md:text-sm font-bold rounded-full hover:scale-105 active:scale-95 transition-all shadow-[0_4px_16px_rgba(88,101,242,0.3)]">
-            <span class="hidden xs:inline">Save Changes</span>
-            <span class="xs:hidden">Save</span>
-        </button>
-    </div>
-</header>
-
-<!-- ═══════════════ MAIN CONTENT ═══════════════ -->
-<main class="ml-0 md:ml-64 pt-16 h-screen overflow-y-auto bg-surface">
-<div class="p-4 md:p-10 max-w-7xl mx-auto space-y-6 md:space-y-10">
-
-    <!-- ── Bot Status Hero ── -->
-    <section id="overview" class="grid grid-cols-1 lg:grid-cols-12 gap-4 md:gap-6">
-        <div class="lg:col-span-8 bg-surface-container-low rounded-2xl md:rounded-3xl p-6 md:p-8 flex flex-col sm:flex-row items-center gap-6 relative overflow-hidden group">
-            <div class="absolute -right-20 -top-20 w-64 h-64 bg-primary-container/10 blur-[100px] rounded-full group-hover:bg-primary-container/20 transition-all duration-700 pointer-events-none"></div>
-            <div class="relative flex-shrink-0">
-                <div class="w-16 h-16 md:w-20 md:h-20 rounded-2xl bg-gradient-to-br from-primary-container to-primary flex items-center justify-center shadow-[0_8px_24px_rgba(88,101,242,0.3)]">
-                    <span class="material-symbols-outlined text-3xl md:text-4xl text-on-primary">smart_toy</span>
-                </div>
-                <div class="absolute -bottom-1 -right-1 w-4 h-4 md:w-5 md:h-5 bg-[#23a55a] border-2 border-surface-container-low rounded-full animate-pulse"></div>
-            </div>
-            <div class="flex-1 min-w-0 text-center sm:text-left">
-                <div class="flex items-center justify-center sm:justify-start gap-3 mb-1 flex-wrap">
-                    <h2 class="text-2xl md:text-3xl font-extrabold tracking-tight text-on-surface" style="font-family:'Manrope',sans-serif;">DiscoBunty</h2>
-                    <span class="bg-primary-container/20 text-primary text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-tighter">Active</span>
-                </div>
-                <p class="text-on-surface-variant text-xs md:text-sm leading-relaxed max-w-md">Multi-server Discord management bot with Docker integration, SSH control, and automated workflows.</p>
-                <div class="flex justify-center sm:justify-start gap-6 mt-4">
-                    <div class="flex flex-col">
-                        <span class="text-[10px] uppercase font-bold text-primary tracking-widest">Servers</span>
-                        <span class="text-lg md:text-xl font-bold" id="serverCountDisplay" style="font-family:'Manrope',sans-serif;">0</span>
-                    </div>
-                    <div class="flex flex-col">
-                        <span class="text-[10px] uppercase font-bold text-secondary tracking-widest">Status</span>
-                        <span class="text-lg md:text-xl font-bold text-[#4ade80]" style="font-family:'Manrope',sans-serif;">Online</span>
-                    </div>
-                </div>
-            </div>
+            <button class="btn btn-danger" type="submit">Logout</button>
+          </form>
         </div>
-        <div class="lg:col-span-4 bg-surface-container-high rounded-2xl md:rounded-3xl p-6 md:p-8 flex flex-col justify-between" style="border-bottom: 4px solid #c33900;">
-            <h3 class="text-base font-bold mb-4" style="font-family:'Manrope',sans-serif;">Quick Actions</h3>
-            <div class="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-1 gap-2 flex-1">
-                <button onclick="document.getElementById('settings').scrollIntoView({behavior:'smooth'})" class="w-full py-2.5 px-4 bg-surface-container-highest rounded-xl text-on-surface text-sm font-medium text-left flex items-center gap-3 hover:bg-surface-bright transition-colors">
-                    <span class="material-symbols-outlined text-primary text-base">tune</span>
-                    <span class="truncate">Settings</span>
-                </button>
-                <button onclick="openServerModal()" class="w-full py-2.5 px-4 bg-surface-container-highest rounded-xl text-on-surface text-sm font-medium text-left flex items-center gap-3 hover:bg-surface-bright transition-colors">
-                    <span class="material-symbols-outlined text-secondary text-base">add_circle</span>
-                    <span class="truncate">Add Server</span>
-                </button>
-                <button onclick="document.getElementById('logs').scrollIntoView({behavior:'smooth'})" class="w-full py-2.5 px-4 bg-surface-container-highest rounded-xl text-on-surface text-sm font-medium text-left flex items-center gap-3 hover:bg-surface-bright transition-colors">
-                    <span class="material-symbols-outlined text-outline text-base">receipt_long</span>
-                    <span class="truncate">View Logs</span>
-                </button>
-            </div>
-        </div>
+      </div>
+    </header>
+
+    <section class="grid gap-4 md:grid-cols-4">
+      <div class="panel p-5"><p class="text-xs uppercase tracking-[0.18em] text-[#8f8fa0]">Servers</p><p id="serverCountDisplay" class="mt-3 text-3xl font-extrabold">0</p></div>
+      <div class="panel p-5"><p class="text-xs uppercase tracking-[0.18em] text-[#8f8fa0]">Docker Mode</p><p class="mt-3 text-2xl font-bold">{{ "Enabled" if config.features.enable_docker else "Disabled" }}</p></div>
+      <div class="panel p-5"><p class="text-xs uppercase tracking-[0.18em] text-[#8f8fa0]">WebUI</p><p class="mt-3 text-sm text-[#c6c5d7]">Backup export, restore, first-run setup, and audit viewing are enabled.</p></div>
+      <div class="panel p-5"><p class="text-xs uppercase tracking-[0.18em] text-[#8f8fa0]">Status</p><p id="saveStatus" class="mt-3 text-sm text-[#4ade80]">Ready</p></div>
     </section>
 
-    <!-- ── Core Configuration ── -->
-    <section id="settings" class="bg-surface-container-low rounded-2xl md:rounded-3xl p-6 md:p-10">
-        <div class="mb-8 flex items-center justify-between gap-4">
-            <div>
-                <h2 class="text-xl md:text-2xl font-black tracking-tight mb-1" style="font-family:'Manrope',sans-serif;">Core Configuration</h2>
-                <p class="text-on-surface-variant text-xs md:text-sm">Manage bot credentials and environment parameters</p>
-            </div>
-            <button onclick="saveCoreConfig()" class="flex-shrink-0 px-4 md:px-5 py-2 bg-gradient-to-br from-primary-container to-primary text-on-primary text-xs md:text-sm font-bold rounded-full hover:scale-105 active:scale-95 transition-all">
-                Save
-            </button>
+    <section class="panel p-6">
+      <div class="flex items-end justify-between gap-3">
+        <div>
+          <h2 class="text-xl font-extrabold">Fleet Observability</h2>
+          <p class="text-sm text-[#c6c5d7]">CPU, RAM, disk, uptime, Docker container count, and backup freshness per server.</p>
         </div>
-
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-10">
-
-            <!-- Discord Settings -->
-            <div id="discord" class="space-y-6">
-                <div class="flex items-center gap-2 mb-2">
-                    <span class="material-symbols-outlined text-primary text-base">tag</span>
-                    <span class="text-xs font-bold text-primary uppercase tracking-widest">Discord</span>
-                </div>
-
-                <div>
-                    <label class="block text-xs font-bold text-on-surface-variant mb-2 uppercase tracking-wider">Bot Token</label>
-                    <input type="password" id="DISCORD_TOKEN" value="{{ config.discord.token or '' }}"
-                        class="w-full bg-surface-container-lowest border-none rounded-xl py-3 px-5 text-on-surface font-mono text-sm focus:ring-2 focus:ring-primary focus:bg-surface-container-high transition-all outline-none"
-                        placeholder="Discord Bot Token">
-                </div>
-
-                <div>
-                    <label class="block text-xs font-bold text-on-surface-variant mb-2 uppercase tracking-wider">Guild ID <span class="normal-case text-outline font-normal">(optional)</span></label>
-                    <input type="text" id="GUILD_ID" value="{{ config.discord.guild_id or '' }}"
-                        class="w-full bg-surface-container-lowest border-none rounded-xl py-3 px-5 text-on-surface text-sm focus:ring-2 focus:ring-primary focus:bg-surface-container-high transition-all outline-none"
-                        placeholder="Server / Guild ID">
-                </div>
-
-                <div>
-                    <label class="block text-xs font-bold text-on-surface-variant mb-2 uppercase tracking-wider">Allowed Roles <span class="normal-case text-outline font-normal">(comma-separated)</span></label>
-                    <input type="text" id="ALLOWED_ROLES" value="{{ config.discord.allowed_roles or '' }}"
-                        class="w-full bg-surface-container-lowest border-none rounded-xl py-3 px-5 text-on-surface text-sm focus:ring-2 focus:ring-primary focus:bg-surface-container-high transition-all outline-none"
-                        placeholder="admin, moderator">
-                </div>
-            </div>
-
-            <!-- WebUI + Features -->
-            <div class="space-y-4">
-                <div class="flex items-center gap-2 mb-2">
-                    <span class="material-symbols-outlined text-secondary text-base">web</span>
-                    <span class="text-xs font-bold text-secondary uppercase tracking-widest">WebUI</span>
-                </div>
-
-                <div class="mb-6">
-                    <label class="block text-xs font-bold text-on-surface-variant mb-2 uppercase tracking-wider">WebUI Password</label>
-                    <input type="password" id="WEB_PASSWORD" value="{{ config.webui.password or '' }}"
-                        class="w-full bg-surface-container-lowest border-none rounded-xl py-3 px-5 text-on-surface text-sm focus:ring-2 focus:ring-primary focus:bg-surface-container-high transition-all outline-none"
-                        placeholder="WebUI login password">
-                </div>
-
-                <div id="features" class="flex items-center gap-2 mb-2 pt-2">
-                    <span class="material-symbols-outlined text-tertiary text-base">widgets</span>
-                    <span class="text-xs font-bold text-tertiary uppercase tracking-widest">Features</span>
-                </div>
-
-                <!-- Docker Integration Toggle -->
-                <div class="bg-surface-container-high p-5 rounded-2xl flex items-center justify-between group hover:bg-surface-container-highest transition-colors">
-                    <div class="flex items-center gap-4">
-                        <div class="p-2.5 bg-primary-container/10 text-primary rounded-xl group-hover:bg-primary-container group-hover:text-on-primary transition-colors">
-                            <span class="material-symbols-outlined text-sm">deployed_code</span>
-                        </div>
-                        <div>
-                            <h5 class="font-bold text-sm">Docker Integration</h5>
-                            <p class="text-xs text-on-surface-variant mt-0.5">Enable Docker commands via SSH</p>
-                        </div>
-                    </div>
-                    <label class="na-toggle">
-                        <input type="checkbox" id="ENABLE_DOCKER" {{ 'checked' if config.features.enable_docker }}>
-                        <span class="na-track"><span class="na-thumb"></span></span>
-                    </label>
-                </div>
-
-                <!-- Power Control Toggle -->
-                <div class="bg-surface-container-high p-5 rounded-2xl flex items-center justify-between group hover:bg-surface-container-highest transition-colors">
-                    <div class="flex items-center gap-4">
-                        <div class="p-2.5 bg-secondary-container/10 text-secondary rounded-xl group-hover:bg-secondary-container group-hover:text-on-secondary-container transition-colors">
-                            <span class="material-symbols-outlined text-sm">power_settings_new</span>
-                        </div>
-                        <div>
-                            <h5 class="font-bold text-sm">Power Control</h5>
-                            <p class="text-xs text-on-surface-variant mt-0.5">Enable server power management</p>
-                        </div>
-                    </div>
-                    <label class="na-toggle">
-                        <input type="checkbox" id="POWER_CONTROL_ENABLED" {{ 'checked' if config.features.power_control_enabled }}>
-                        <span class="na-track"><span class="na-thumb"></span></span>
-                    </label>
-                </div>
-
-                <div>
-                    <label class="block text-xs font-bold text-on-surface-variant mb-2 uppercase tracking-wider">Power Control Password</label>
-                    <input type="password" id="POWER_CONTROL_PASSWORD" value="{{ config.features.power_control_password or '' }}"
-                        class="w-full bg-surface-container-lowest border-none rounded-xl py-3 px-5 text-on-surface text-sm focus:ring-2 focus:ring-primary focus:bg-surface-container-high transition-all outline-none"
-                        placeholder="Power control passphrase">
-                </div>
-            </div>
-
-        </div>
+        <p id="overviewStatus" class="text-xs uppercase tracking-[0.18em] text-[#8f8fa0]">Loading…</p>
+      </div>
+      <div id="overviewGrid" class="mt-5 grid gap-4 lg:grid-cols-2"></div>
     </section>
 
-    <!-- ── Server Management ── -->
-    <section id="servers" class="space-y-6">
-        <div class="flex items-baseline justify-between">
-            <div>
-                <h2 class="text-2xl font-black tracking-tight" style="font-family:'Manrope',sans-serif;">SSH Servers</h2>
-                <p class="text-on-surface-variant text-sm mt-1">Managed remote hosts for Docker &amp; power commands</p>
-            </div>
-            <button onclick="openServerModal()" class="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-br from-primary-container to-primary text-on-primary text-sm font-bold rounded-full hover:scale-105 active:scale-95 transition-all shadow-[0_4px_16px_rgba(88,101,242,0.25)]">
-                <span class="material-symbols-outlined text-base">add</span>
-                Add Server
-            </button>
+    <section class="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
+      <div class="panel p-6">
+        <div class="flex items-center justify-between gap-3">
+          <div>
+            <h2 class="text-xl font-extrabold">Core Configuration</h2>
+            <p class="text-sm text-[#c6c5d7]">Global roles plus per-server role scopes.</p>
+          </div>
+          <button class="btn btn-primary" onclick="saveFullConfig()">Save Changes</button>
         </div>
-        <div id="serverList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+        <div class="mt-5 grid gap-4 md:grid-cols-2">
+          <label><span class="mb-2 block text-xs uppercase tracking-[0.18em] text-[#8f8fa0]">Discord Token</span><input id="DISCORD_TOKEN" class="field" type="password" value="{{ config.discord.token or '' }}"></label>
+          <label><span class="mb-2 block text-xs uppercase tracking-[0.18em] text-[#8f8fa0]">Guild ID</span><input id="GUILD_ID" class="field" type="text" value="{{ config.discord.guild_id or '' }}"></label>
+          <label class="md:col-span-2"><span class="mb-2 block text-xs uppercase tracking-[0.18em] text-[#8f8fa0]">Global Allowed Roles</span><input id="ALLOWED_ROLES" class="field" type="text" value="{{ config.discord.allowed_roles or '' }}"></label>
+          <label><span class="mb-2 block text-xs uppercase tracking-[0.18em] text-[#8f8fa0]">WebUI Password</span><input id="WEB_PASSWORD" class="field" type="password" value="{{ config.webui.password or '' }}"></label>
+          <label><span class="mb-2 block text-xs uppercase tracking-[0.18em] text-[#8f8fa0]">Power Control Password</span><input id="POWER_CONTROL_PASSWORD" class="field" type="password" value="{{ config.features.power_control_password or '' }}"></label>
+          <label class="panel flex items-center justify-between p-4"><span><span class="block text-sm font-semibold">Docker Integration</span><span class="text-xs text-[#8f8fa0]">Discord Docker commands</span></span><input id="ENABLE_DOCKER" type="checkbox" {{ 'checked' if config.features.enable_docker }}></label>
+          <label class="panel flex items-center justify-between p-4"><span><span class="block text-sm font-semibold">Power Control</span><span class="text-xs text-[#8f8fa0]">Reboot and shutdown</span></span><input id="POWER_CONTROL_ENABLED" type="checkbox" {{ 'checked' if config.features.power_control_enabled }}></label>
+        </div>
+      </div>
+      <div class="panel p-6">
+        <h2 class="text-xl font-extrabold">Fleet Checks</h2>
+        <p class="text-sm text-[#c6c5d7]">SSH, sudo, Docker, known-host state, and backup path checks.</p>
+        <div id="checksGrid" class="mt-5 space-y-3"></div>
+      </div>
     </section>
 
-    <!-- ── Application Logs ── -->
-    <section id="logs" class="bg-surface-container-low rounded-3xl p-8">
-        <div class="flex items-center justify-between mb-6">
-            <div>
-                <h2 class="text-2xl font-black tracking-tight" style="font-family:'Manrope',sans-serif;">Application Logs</h2>
-                <p class="text-on-surface-variant text-sm mt-1">Live output · auto-refreshes every 5 seconds</p>
-            </div>
-            <div class="flex items-center gap-2">
-                <span class="w-2 h-2 rounded-full bg-[#4ade80] animate-pulse inline-block"></span>
-                <span class="text-xs text-on-surface-variant font-medium">Live</span>
-            </div>
+    <section class="panel p-6">
+      <div class="flex items-center justify-between gap-3">
+        <div>
+          <h2 class="text-xl font-extrabold">Servers</h2>
+          <p class="text-sm text-[#c6c5d7]">Optional backup path drives the “last backup age” metric. Optional server roles narrow Discord access beyond the global role list.</p>
         </div>
-        <div id="logs-container" class="rounded-2xl p-5 h-96 overflow-y-auto leading-relaxed">Loading application logs...</div>
+        <button class="btn btn-primary" onclick="openServerModal()">Add Server</button>
+      </div>
+      <div id="serverList" class="mt-5 grid gap-4 lg:grid-cols-2"></div>
     </section>
 
-</div>
+    <section class="grid gap-6 xl:grid-cols-2">
+      <div class="panel p-6"><div class="flex items-center justify-between"><h2 class="text-xl font-extrabold">Application Logs</h2><button class="btn btn-muted" onclick="fetchLogs()">Refresh</button></div><div id="logs-container" class="terminal mt-5 h-80 overflow-y-auto rounded-[20px] p-4">Loading logs…</div></div>
+      <div class="panel p-6"><div class="flex items-center justify-between"><h2 class="text-xl font-extrabold">Audit Trail</h2><button class="btn btn-muted" onclick="fetchAuditLogs()">Refresh</button></div><div id="audit-container" class="terminal mt-5 h-80 overflow-y-auto rounded-[20px] p-4">Loading audit…</div></div>
+    </section>
+  </div>
 
-<!-- Footer -->
-<footer class="p-10 text-center text-outline text-xs font-label uppercase tracking-widest opacity-40">
-    DiscoBunty Core • Neon Architect UI
-</footer>
-</main>
-
-<!-- ═══════════════ SERVER MODAL ═══════════════ -->
-<div id="serverModal" class="hidden fixed inset-0 z-50 flex items-center justify-center">
-    <!-- Backdrop -->
-    <div onclick="closeServerModal()" class="absolute inset-0 bg-surface-container-lowest/80 backdrop-blur-sm"></div>
-    <!-- Panel -->
-    <div class="relative bg-surface-container-high rounded-3xl p-8 w-full max-w-lg mx-4 shadow-[0_20px_60px_rgba(0,0,0,0.6)]">
-        <div class="flex items-center justify-between mb-6">
-            <h3 id="modalTitle" class="text-xl font-bold" style="font-family:'Manrope',sans-serif;">Add Server</h3>
-            <button onclick="closeServerModal()" class="p-2 text-on-surface-variant hover:text-on-surface hover:bg-surface-container-highest rounded-xl transition-colors">
-                <span class="material-symbols-outlined">close</span>
-            </button>
+  <div id="serverModal" class="hidden fixed inset-0 z-50 items-center justify-center bg-black/70 p-4">
+    <div class="panel w-full max-w-2xl p-6">
+      <div class="flex items-center justify-between"><h3 id="modalTitle" class="text-xl font-extrabold">Add Server</h3><button class="btn btn-muted" onclick="closeServerModal()">Close</button></div>
+      <form id="serverForm" class="mt-5 space-y-4">
+        <input id="serverIndex" type="hidden" value="-1"><input id="srvOriginalAlias" type="hidden" value="">
+        <div class="grid gap-4 md:grid-cols-2">
+          <label><span class="mb-2 block text-xs uppercase tracking-[0.18em] text-[#8f8fa0]">Alias</span><input id="srvAlias" class="field" required></label>
+          <label><span class="mb-2 block text-xs uppercase tracking-[0.18em] text-[#8f8fa0]">Host</span><input id="srvHost" class="field" required></label>
+          <label><span class="mb-2 block text-xs uppercase tracking-[0.18em] text-[#8f8fa0]">User</span><input id="srvUser" class="field"></label>
+          <label><span class="mb-2 block text-xs uppercase tracking-[0.18em] text-[#8f8fa0]">Port</span><input id="srvPort" class="field" type="number" min="1" max="65535"></label>
+          <label><span class="mb-2 block text-xs uppercase tracking-[0.18em] text-[#8f8fa0]">Auth Method</span><select id="srvAuth" class="field" onchange="toggleAuthFields()"><option value="key">SSH Key</option><option value="password">Password</option></select></label>
+          <label><span class="mb-2 block text-xs uppercase tracking-[0.18em] text-[#8f8fa0]">Server Role Scope</span><input id="srvAllowedRoles" class="field" placeholder="Optional comma-separated roles"></label>
+          <label class="md:col-span-2"><span class="mb-2 block text-xs uppercase tracking-[0.18em] text-[#8f8fa0]">Backup Path</span><input id="srvBackupPath" class="field" placeholder="/srv/backups"></label>
         </div>
-
-        <form id="serverForm" class="space-y-4">
-            <input type="hidden" id="serverIndex" value="-1">
-            <input type="hidden" id="srvOriginalAlias" value="">
-
-            <div class="grid grid-cols-2 gap-4">
-                <div>
-                    <label class="block text-xs font-bold text-on-surface-variant mb-2 uppercase tracking-wider">Alias</label>
-                    <input type="text" id="srvAlias" required
-                        class="w-full bg-surface-container-lowest border-none rounded-xl py-3 px-4 text-on-surface text-sm focus:ring-2 focus:ring-primary focus:bg-surface-container-high transition-all outline-none"
-                        placeholder="my-server">
-                </div>
-                <div>
-                    <label class="block text-xs font-bold text-on-surface-variant mb-2 uppercase tracking-wider">Hostname / IP</label>
-                    <input type="text" id="srvHost" required
-                        class="w-full bg-surface-container-lowest border-none rounded-xl py-3 px-4 text-on-surface text-sm focus:ring-2 focus:ring-primary focus:bg-surface-container-high transition-all outline-none"
-                        placeholder="192.168.1.100">
-                </div>
-            </div>
-
-            <div class="grid grid-cols-2 gap-4">
-                <div>
-                    <label class="block text-xs font-bold text-on-surface-variant mb-2 uppercase tracking-wider">User</label>
-                    <input type="text" id="srvUser" value="root"
-                        class="w-full bg-surface-container-lowest border-none rounded-xl py-3 px-4 text-on-surface text-sm focus:ring-2 focus:ring-primary focus:bg-surface-container-high transition-all outline-none">
-                </div>
-                <div>
-                    <label class="block text-xs font-bold text-on-surface-variant mb-2 uppercase tracking-wider">Port</label>
-                    <input type="number" id="srvPort" value="22"
-                        class="w-full bg-surface-container-lowest border-none rounded-xl py-3 px-4 text-on-surface text-sm focus:ring-2 focus:ring-primary focus:bg-surface-container-high transition-all outline-none">
-                </div>
-            </div>
-
-            <div>
-                <label class="block text-xs font-bold text-on-surface-variant mb-2 uppercase tracking-wider">Auth Method</label>
-                <div class="relative">
-                    <select id="srvAuth" onchange="toggleAuthFields()"
-                        class="w-full appearance-none bg-surface-container-lowest border-none rounded-xl py-3 px-4 text-on-surface text-sm focus:ring-2 focus:ring-primary focus:bg-surface-container-high transition-all outline-none cursor-pointer">
-                        <option value="key">SSH Key</option>
-                        <option value="password">Password</option>
-                    </select>
-                    <span class="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-outline">expand_more</span>
-                </div>
-            </div>
-
-            <div id="passwordField" class="hidden">
-                <label class="block text-xs font-bold text-on-surface-variant mb-2 uppercase tracking-wider">Password</label>
-                <input type="password" id="srvPassword"
-                    class="w-full bg-surface-container-lowest border-none rounded-xl py-3 px-4 text-on-surface text-sm focus:ring-2 focus:ring-primary focus:bg-surface-container-high transition-all outline-none">
-            </div>
-
-            <div id="keyField">
-                <label class="block text-xs font-bold text-on-surface-variant mb-2 uppercase tracking-wider">SSH Key <span class="normal-case text-outline font-normal">(paste content or path)</span></label>
-                <textarea id="srvKey" rows="4"
-                    class="w-full bg-surface-container-lowest border-none rounded-xl py-3 px-4 text-on-surface font-mono text-xs focus:ring-2 focus:ring-primary focus:bg-surface-container-high transition-all outline-none resize-none"
-                    placeholder="-----BEGIN OPENSSH PRIVATE KEY-----"></textarea>
-            </div>
-
-            <div id="modalStatus" class="hidden rounded-xl px-4 py-3 text-sm font-medium"></div>
-
-            <div class="flex gap-3 pt-2">
-                <button type="button" onclick="testServerConnection()"
-                    class="flex-1 py-3 bg-surface-container-highest text-on-surface text-sm font-bold rounded-xl hover:bg-surface-bright transition-colors flex items-center justify-center gap-2">
-                    <span class="material-symbols-outlined text-base">wifi_tethering</span>
-                    Test
-                </button>
-                <button type="submit"
-                    class="flex-1 py-3 bg-gradient-to-br from-primary-container to-primary text-on-primary text-sm font-bold rounded-xl hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-2">
-                    <span class="material-symbols-outlined text-base">save</span>
-                    Save Server
-                </button>
-                <button type="button" onclick="closeServerModal()"
-                    class="py-3 px-4 bg-error-container/20 text-error text-sm font-bold rounded-xl hover:bg-error-container/40 transition-colors">
-                    <span class="material-symbols-outlined text-base">close</span>
-                </button>
-            </div>
-        </form>
+        <div id="passwordField" class="hidden"><label><span class="mb-2 block text-xs uppercase tracking-[0.18em] text-[#8f8fa0]">Password</span><input id="srvPassword" class="field" type="password"></label></div>
+        <div id="keyField"><label><span class="mb-2 block text-xs uppercase tracking-[0.18em] text-[#8f8fa0]">SSH Key</span><textarea id="srvKey" class="field mono" rows="5"></textarea></label></div>
+        <div id="modalStatus" class="hidden rounded-[18px] px-4 py-3 text-sm"></div>
+        <div class="flex gap-3"><button class="btn btn-muted" type="button" onclick="testServerConnection()">Test Connection</button><button class="btn btn-primary" type="submit">Save Server</button></div>
+      </form>
     </div>
-</div>
+  </div>
 
-<!-- ═══════════════ JAVASCRIPT ═══════════════ -->
-<script>
+  <script>
     let servers = {{ servers | tojson }};
     const config = {{ config | tojson }};
     const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
 
-    /* ── Mobile Sidebar Toggle ── */
-    function toggleSidebar() {
-        const sidebar = document.getElementById('sidebar');
-        const backdrop = document.getElementById('sidebarBackdrop');
-        const isOpen = !sidebar.classList.contains('-translate-x-full');
-
-        if (isOpen) {
-            sidebar.classList.add('-translate-x-full');
-            backdrop.classList.add('hidden');
-            backdrop.classList.remove('opacity-100');
-            document.body.classList.remove('modal-open');
-        } else {
-            sidebar.classList.remove('-translate-x-full');
-            backdrop.classList.remove('hidden');
-            setTimeout(() => backdrop.classList.add('opacity-100'), 10);
-            document.body.classList.add('modal-open');
-        }
-    }
-
-    /* ── UI Handlers ── */
-    function escapeHtml(str) {
-        return String(str)
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;')
-            .replace(/'/g, '&#39;');
-    }
-
-    function showSaveStatus(msg, isError) {
-        const el = document.getElementById('saveStatus');
-        el.textContent = msg;
-        el.style.color = isError ? '#ffb4ab' : '#4ade80';
-        el.style.opacity = '1';
-        setTimeout(() => { el.style.opacity = '0'; }, 2500);
-    }
-
-    /* ── Server List Rendering ── */
+    function escapeHtml(value) { return String(value ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+    function setStatus(message, isError=false) { const el = document.getElementById('saveStatus'); el.textContent = message; el.style.color = isError ? '#ffb4ab' : '#4ade80'; }
     function renderServers() {
-        const list = document.getElementById('serverList');
-        const countEl = document.getElementById('serverCountDisplay');
-        list.innerHTML = '';
-        if (countEl) countEl.textContent = servers.length;
-
-        if (servers.length === 0) {
-            list.innerHTML = `
-                <div class="col-span-full bg-surface-container-low rounded-3xl p-12 flex flex-col items-center justify-center text-center border-2 border-dashed border-outline-variant/20">
-                    <div class="w-14 h-14 rounded-full bg-surface-container-highest flex items-center justify-center text-outline mb-4">
-                        <span class="material-symbols-outlined text-3xl">dns</span>
-                    </div>
-                    <p class="text-on-surface-variant text-sm font-medium">No servers configured.</p>
-                    <p class="text-outline text-xs mt-1">Click "Add Server" to get started.</p>
-                </div>`;
-            return;
-        }
-
-        servers.forEach((s, index) => {
-            const item = document.createElement('div');
-            item.className = 'bg-surface-container-low p-6 rounded-3xl hover:scale-[1.01] hover:bg-surface-container-high transition-all group flex flex-col gap-4 relative overflow-hidden';
-            item.innerHTML = `
-                <div class="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-primary-container to-primary rounded-l-3xl opacity-60"></div>
-                <div class="pl-2">
-                    <div class="flex items-start justify-between gap-2">
-                        <div>
-                            <h4 class="font-bold text-on-surface text-base leading-tight" style="font-family:'Manrope',sans-serif;">${escapeHtml(s.alias)}</h4>
-                            <p class="text-sm text-on-surface-variant mt-0.5 font-mono">${escapeHtml(s.host)}</p>
-                        </div>
-                        <div class="flex gap-1.5 flex-shrink-0">
-                            <button onclick="editServer(${index})"
-                                class="p-2 bg-surface-container-highest rounded-xl text-primary hover:bg-primary-container hover:text-on-primary transition-all" title="Edit">
-                                <span class="material-symbols-outlined text-sm">edit</span>
-                            </button>
-                            <button onclick="deleteServer(${index})"
-                                class="p-2 bg-surface-container-highest rounded-xl text-on-surface-variant hover:bg-error-container/40 hover:text-error transition-all" title="Delete">
-                                <span class="material-symbols-outlined text-sm">delete</span>
-                            </button>
-                        </div>
-                    </div>
-                    <div class="flex gap-2 mt-3 flex-wrap">
-                        <span class="px-2.5 py-1 bg-surface-container-highest rounded-lg text-[10px] font-bold uppercase tracking-wider text-outline">${escapeHtml(s.user)}@${escapeHtml(String(s.port))}</span>
-                        <span class="px-2.5 py-1 bg-surface-container-highest rounded-lg text-[10px] font-bold uppercase tracking-wider text-outline">${escapeHtml(s.auth_method)}</span>
-                    </div>
-                </div>`;
-            list.appendChild(item);
-        });
+      document.getElementById('serverCountDisplay').textContent = servers.length;
+      const list = document.getElementById('serverList');
+      list.innerHTML = servers.length ? '' : '<div class="panel p-8 text-center text-[#8f8fa0]">No servers configured.</div>';
+      servers.forEach((server, index) => {
+        const card = document.createElement('div');
+        card.className = 'panel p-5';
+        card.innerHTML = `<div class="flex items-start justify-between gap-3"><div><h3 class="text-lg font-bold">${escapeHtml(server.alias)}</h3><p class="mt-1 text-sm text-[#c6c5d7]">${escapeHtml(server.host)}</p></div><div class="flex gap-2"><button class="btn btn-muted !px-3 !py-1.5 !text-xs" onclick="editServer(${index})">Edit</button><button class="btn btn-danger !px-3 !py-1.5 !text-xs" onclick="deleteServer(${index})">Delete</button></div></div><div class="mt-4 flex flex-wrap gap-2 text-xs text-[#c6c5d7]"><span class="rounded-full bg-[#33353a] px-3 py-1">${escapeHtml(server.user || 'root')}@${escapeHtml(server.port || 22)}</span><span class="rounded-full bg-[#33353a] px-3 py-1">${escapeHtml(server.auth_method || 'key')}</span><span class="rounded-full bg-[#33353a] px-3 py-1">${server.allowed_roles ? 'roles: ' + escapeHtml(server.allowed_roles) : 'roles: global'}</span><span class="rounded-full bg-[#33353a] px-3 py-1">${server.backup_path ? 'backup: ' + escapeHtml(server.backup_path) : 'backup: n/a'}</span></div>`;
+        list.appendChild(card);
+      });
     }
-
-    /* ── Server Modal ── */
-    function openServerModal(index = -1) {
-        document.getElementById('serverIndex').value = index;
-        document.getElementById('modalStatus').classList.add('hidden');
-        if (index === -1) {
-            document.getElementById('modalTitle').innerText = 'Add Server';
-            document.getElementById('serverForm').reset();
-            document.getElementById('srvOriginalAlias').value = '';
-            document.getElementById('srvUser').value = 'root';
-            document.getElementById('srvPort').value = '22';
-        } else {
-            const s = servers[index];
-            document.getElementById('modalTitle').innerText = 'Edit: ' + s.alias;
-            document.getElementById('srvOriginalAlias').value = s._original_alias || s.alias || '';
-            document.getElementById('srvAlias').value = s.alias;
-            document.getElementById('srvHost').value = s.host;
-            document.getElementById('srvUser').value = s.user;
-            document.getElementById('srvPort').value = s.port;
-            document.getElementById('srvAuth').value = s.auth_method;
-            document.getElementById('srvPassword').value = s.password || '';
-            document.getElementById('srvKey').value = s.key || '';
-        }
-        toggleAuthFields();
-        document.getElementById('serverModal').classList.remove('hidden');
-        document.body.classList.add('modal-open');
+    function toggleAuthFields() { const method = document.getElementById('srvAuth').value; document.getElementById('passwordField').classList.toggle('hidden', method !== 'password'); document.getElementById('keyField').classList.toggle('hidden', method !== 'key'); }
+    function openServerModal(index=-1) {
+      const modal = document.getElementById('serverModal');
+      document.getElementById('serverIndex').value = index;
+      document.getElementById('modalStatus').classList.add('hidden');
+      if (index === -1) { document.getElementById('serverForm').reset(); document.getElementById('srvOriginalAlias').value=''; document.getElementById('srvUser').value='root'; document.getElementById('srvPort').value='22'; document.getElementById('modalTitle').textContent='Add Server'; }
+      else { const s = servers[index]; document.getElementById('modalTitle').textContent=`Edit ${s.alias}`; document.getElementById('srvOriginalAlias').value=s._original_alias || s.alias || ''; document.getElementById('srvAlias').value=s.alias || ''; document.getElementById('srvHost').value=s.host || ''; document.getElementById('srvUser').value=s.user || 'root'; document.getElementById('srvPort').value=s.port || 22; document.getElementById('srvAuth').value=s.auth_method || 'key'; document.getElementById('srvPassword').value=s.password || ''; document.getElementById('srvKey').value=s.key || ''; document.getElementById('srvAllowedRoles').value=s.allowed_roles || ''; document.getElementById('srvBackupPath').value=s.backup_path || ''; }
+      toggleAuthFields(); modal.classList.remove('hidden'); modal.classList.add('flex');
     }
-
-    function closeServerModal() {
-        document.getElementById('serverModal').classList.add('hidden');
-        document.body.classList.remove('modal-open');
+    function closeServerModal() { const modal = document.getElementById('serverModal'); modal.classList.add('hidden'); modal.classList.remove('flex'); }
+    function collectModalServerData() { return { alias: document.getElementById('srvAlias').value, _original_alias: document.getElementById('srvOriginalAlias').value, host: document.getElementById('srvHost').value, user: document.getElementById('srvUser').value, port: parseInt(document.getElementById('srvPort').value, 10), auth_method: document.getElementById('srvAuth').value, password: document.getElementById('srvPassword').value, key: document.getElementById('srvKey').value, allowed_roles: document.getElementById('srvAllowedRoles').value, backup_path: document.getElementById('srvBackupPath').value }; }
+    async function testServerConnection(trustHost=false) {
+      const statusEl = document.getElementById('modalStatus'); statusEl.classList.remove('hidden'); statusEl.className='rounded-[18px] px-4 py-3 text-sm bg-[#33353a] text-[#c6c5d7]'; statusEl.textContent='Testing SSH connectivity…';
+      const payload = collectModalServerData(); payload.trust_host = trustHost;
+      try { const res = await fetch('/api/test-server', { method:'POST', headers:{'Content-Type':'application/json','X-CSRF-Token':csrfToken}, body:JSON.stringify(payload) }); const result = await res.json(); if (!result.success && result.fingerprint) { statusEl.className='rounded-[18px] px-4 py-3 text-sm bg-[#93000a]/30 text-[#ffb4ab]'; statusEl.innerHTML=`<p>${escapeHtml(result.message)}</p><code class="mt-2 block break-all rounded-xl bg-[#0c0e13] p-3 text-xs">${escapeHtml(result.fingerprint)}</code>${result.message === 'Host key mismatch' ? '<p class="mt-2 text-xs">Automatic trust is blocked because the stored host key changed.</p>' : '<button class="btn btn-primary mt-3 !py-2 !text-xs" type="button" onclick="testServerConnection(true)">Trust & Retry</button>'}`; return; } statusEl.className = result.success ? 'rounded-[18px] px-4 py-3 text-sm bg-[#23a55a]/20 text-[#4ade80]' : 'rounded-[18px] px-4 py-3 text-sm bg-[#93000a]/30 text-[#ffb4ab]'; statusEl.textContent = result.message; } catch (error) { statusEl.className='rounded-[18px] px-4 py-3 text-sm bg-[#93000a]/30 text-[#ffb4ab]'; statusEl.textContent=`Test failed: ${error.message}`; }
     }
-
-    function toggleAuthFields() {
-        const method = document.getElementById('srvAuth').value;
-        document.getElementById('passwordField').classList.toggle('hidden', method !== 'password');
-        document.getElementById('keyField').classList.toggle('hidden', method !== 'key');
-    }
-
-    async function testServerConnection(trustHost = false) {
-        const statusEl = document.getElementById('modalStatus');
-        statusEl.classList.remove('hidden');
-        statusEl.className = 'rounded-xl px-4 py-3 text-sm font-medium bg-surface-container-highest text-on-surface-variant';
-        statusEl.innerText = trustHost ? 'Trusting and connecting…' : 'Testing connection…';
-
-        const serverData = {
-            alias: document.getElementById('srvAlias').value,
-            _original_alias: document.getElementById('srvOriginalAlias').value,
-            host: document.getElementById('srvHost').value,
-            user: document.getElementById('srvUser').value,
-            port: document.getElementById('srvPort').value,
-            auth_method: document.getElementById('srvAuth').value,
-            password: document.getElementById('srvPassword').value,
-            key: document.getElementById('srvKey').value,
-            trust_host: trustHost
-        };
-
-        try {
-            const res = await fetch('/api/test-server', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
-                body: JSON.stringify(serverData)
-            });
-            const result = await res.json();
-            
-            if (!result.success && result.message === 'Host key mismatch') {
-                // SECURITY ALERT: Key has changed for a known host
-                statusEl.innerHTML = `
-                    <div class="flex flex-col gap-3">
-                        <p class="text-error font-bold">🚨 SECURITY ALERT: Host Key Changed!</p>
-                        <p class="text-xs text-on-surface-variant">The fingerprint stored in known_hosts does not match the server. This could be a Man-in-the-Middle attack or the server has been reinstalled.</p>
-                        <div class="bg-surface-container-lowest p-3 rounded-lg border border-error/20">
-                            <p class="text-[10px] text-outline uppercase font-bold mb-1">New Fingerprint (SHA256)</p>
-                            <code id="fp-code-alert" class="text-xs break-all text-on-surface-variant"></code>
-                        </div>
-                        <p class="text-xs font-bold text-error">Automatic trusting is blocked for safety.</p>
-                    </div>`;
-                document.getElementById('fp-code-alert').textContent = result.fingerprint;
-                statusEl.className = 'rounded-xl px-4 py-3 text-sm font-medium bg-error-container/20 border border-error/40';
-            } else if (!result.success && result.fingerprint) {
-                // Unknown new host: Show trust button
-                statusEl.innerHTML = `
-                    <div class="flex flex-col gap-3">
-                        <p class="text-error font-bold">⚠️ Unknown Host Key</p>
-                        <div class="bg-surface-container-lowest p-3 rounded-lg border border-error/20">
-                            <p class="text-[10px] text-outline uppercase font-bold mb-1">Fingerprint (SHA256)</p>
-                            <code id="fp-code" class="text-xs break-all text-on-surface-variant"></code>
-                        </div>
-                        <p class="text-[10px] text-on-surface-variant italic">Please verify this fingerprint matches your server's host key.</p>
-                        <button type="button" onclick="testServerConnection(true)" 
-                            class="py-2 px-4 bg-primary-container text-on-primary-container text-xs font-bold rounded-lg hover:scale-[1.02] active:scale-95 transition-all">
-                            Trust & Add Host Key
-                        </button>
-                    </div>`;
-                document.getElementById('fp-code').textContent = result.fingerprint;
-                statusEl.className = 'rounded-xl px-4 py-3 text-sm font-medium bg-error-container/20';
-            } else {
-                statusEl.innerText = result.message;
-                statusEl.className = result.success
-                    ? 'rounded-xl px-4 py-3 text-sm font-medium bg-[#23a55a]/20 text-[#4ade80]'
-                    : 'rounded-xl px-4 py-3 text-sm font-medium bg-error-container/20 text-error';
-            }
-        } catch (e) {
-            statusEl.innerText = 'Test failed: ' + e.message;
-            statusEl.className = 'rounded-xl px-4 py-3 text-sm font-medium bg-error-container/20 text-error';
-        }
-    }
-
-    document.getElementById('serverForm').addEventListener('submit', (e) => {
-        e.preventDefault();
-        const index = parseInt(document.getElementById('serverIndex').value);
-        const serverData = {
-            alias: document.getElementById('srvAlias').value,
-            _original_alias: document.getElementById('srvOriginalAlias').value,
-            host: document.getElementById('srvHost').value,
-            user: document.getElementById('srvUser').value,
-            port: parseInt(document.getElementById('srvPort').value),
-            auth_method: document.getElementById('srvAuth').value,
-            password: document.getElementById('srvPassword').value,
-            key: document.getElementById('srvKey').value
-        };
-        if (index === -1) {
-            servers.push(serverData);
-        } else {
-            servers[index] = serverData;
-        }
-        renderServers();
-        closeServerModal();
-        saveFullConfig();
-    });
-
+    document.getElementById('serverForm').addEventListener('submit', (event) => { event.preventDefault(); const index = parseInt(document.getElementById('serverIndex').value, 10); const payload = collectModalServerData(); if (index === -1) servers.push(payload); else servers[index] = payload; renderServers(); closeServerModal(); saveFullConfig(); });
     function editServer(index) { openServerModal(index); }
-
-    function deleteServer(index) {
-        if (confirm('Delete server "' + servers[index].alias + '"?')) {
-            servers.splice(index, 1);
-            renderServers();
-            saveFullConfig();
-        }
-    }
-
-    /* ── Config Save Functions ── */
-    async function saveCoreConfig() {
-        const data = {
-            discord: {
-                token: document.getElementById('DISCORD_TOKEN').value,
-                guild_id: document.getElementById('GUILD_ID').value,
-                allowed_roles: document.getElementById('ALLOWED_ROLES').value
-            },
-            features: {
-                enable_docker: document.getElementById('ENABLE_DOCKER').checked,
-                power_control_enabled: document.getElementById('POWER_CONTROL_ENABLED').checked,
-                power_control_password: document.getElementById('POWER_CONTROL_PASSWORD').value
-            },
-            webui: {
-                enabled: config.webui ? config.webui.enabled : true,
-                password: document.getElementById('WEB_PASSWORD').value
-            },
-            servers: servers
-        };
-        await sendConfig(data);
-    }
-
-    async function saveFullConfig() {
-        const data = {
-            discord: config.discord ? Object.assign({}, config.discord) : {},
-            features: config.features ? Object.assign({}, config.features) : {},
-            webui: config.webui ? Object.assign({}, config.webui) : {},
-            servers: servers
-        };
-        if (document.getElementById('DISCORD_TOKEN')) {
-            data.discord.token = document.getElementById('DISCORD_TOKEN').value;
-            data.discord.guild_id = document.getElementById('GUILD_ID').value;
-            data.discord.allowed_roles = document.getElementById('ALLOWED_ROLES').value;
-            data.features.enable_docker = document.getElementById('ENABLE_DOCKER').checked;
-            data.features.power_control_enabled = document.getElementById('POWER_CONTROL_ENABLED').checked;
-            data.features.power_control_password = document.getElementById('POWER_CONTROL_PASSWORD').value;
-            data.webui.password = document.getElementById('WEB_PASSWORD').value;
-        }
-        await sendConfig(data);
-    }
-
-    async function sendConfig(data) {
-        try {
-            const res = await fetch('/save', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
-                body: JSON.stringify(data)
-            });
-            if (res.ok) {
-                showSaveStatus('Configuration saved', false);
-            } else {
-                showSaveStatus('Save failed', true);
-            }
-        } catch (e) {
-            showSaveStatus('Connection error', true);
-        }
-    }
-
-    /* ── Log Viewer ── */
-    async function fetchLogs() {
-        const logBox = document.getElementById('logs-container');
-        try {
-            const res = await fetch('/api/logs');
-            const data = await res.json();
-            if (data.logs) {
-                const wasNearBottom = logBox.scrollHeight - logBox.clientHeight <= logBox.scrollTop + 50;
-                logBox.innerText = data.logs;
-                if (wasNearBottom) logBox.scrollTop = logBox.scrollHeight;
-            } else {
-                logBox.innerText = 'Waiting for logs…';
-            }
-        } catch (e) {
-            console.error('Log fetch error:', e);
-        }
-    }
-
-    /* ── Sidebar active state on scroll ── */
-    function updateActiveNav() {
-        const sections = ['settings', 'discord', 'features', 'servers', 'logs'];
-        const main = document.querySelector('main');
-        let current = '';
-        sections.forEach(id => {
-            const el = document.getElementById(id);
-            if (el) {
-                const rect = el.getBoundingClientRect();
-                if (rect.top <= 100) current = id;
-            }
-        });
-        document.querySelectorAll('.nav-link').forEach(link => {
-            const sec = link.getAttribute('data-section');
-            link.classList.toggle('nav-active', sec === current);
-            if (sec !== current) {
-                link.classList.remove('text-primary');
-                link.classList.add('text-on-surface-variant');
-            } else {
-                link.classList.add('text-primary');
-                link.classList.remove('text-on-surface-variant');
-            }
-        });
-    }
-
-    /* ── Init ── */
-    renderServers();
-    fetchLogs();
-    setInterval(fetchLogs, 5000);
-    document.querySelector('main').addEventListener('scroll', updateActiveNav);
-    updateActiveNav();
-</script>
+    function deleteServer(index) { if (confirm(`Delete server "${servers[index].alias}"?`)) { servers.splice(index, 1); renderServers(); saveFullConfig(); } }
+    function collectConfigData() { return { discord: { token: document.getElementById('DISCORD_TOKEN').value, guild_id: document.getElementById('GUILD_ID').value, allowed_roles: document.getElementById('ALLOWED_ROLES').value }, features: { enable_docker: document.getElementById('ENABLE_DOCKER').checked, power_control_enabled: document.getElementById('POWER_CONTROL_ENABLED').checked, power_control_password: document.getElementById('POWER_CONTROL_PASSWORD').value }, webui: { enabled: config.webui ? config.webui.enabled : true, password: document.getElementById('WEB_PASSWORD').value }, servers }; }
+    async function saveFullConfig() { try { const res = await fetch('/save', { method:'POST', headers:{'Content-Type':'application/json','X-CSRF-Token':csrfToken}, body:JSON.stringify(collectConfigData()) }); const payload = await res.json().catch(() => ({})); if (!res.ok) throw new Error(payload.detail || 'Save failed'); setStatus('Configuration saved successfully.'); } catch (error) { setStatus(`Save failed: ${error.message}`, true); } }
+    async function fetchLogs() { const res = await fetch('/api/logs'); const payload = await res.json(); document.getElementById('logs-container').textContent = payload.logs || 'No log lines captured yet.'; }
+    async function fetchAuditLogs() { const res = await fetch('/api/audit'); const payload = await res.json(); document.getElementById('audit-container').textContent = payload.entries?.length ? payload.entries.join('\n') : 'No audit entries yet.'; }
+    function badge(label, status) { const colors = { ok:'bg-[#23a55a]/20 text-[#4ade80]', fail:'bg-[#93000a]/30 text-[#ffb4ab]', missing:'bg-[#743500]/30 text-[#ffb689]', error:'bg-[#93000a]/30 text-[#ffb4ab]', 'n/a':'bg-[#33353a] text-[#c6c5d7]' }; return `<span class="rounded-full px-3 py-1 text-xs font-semibold ${colors[status] || colors['n/a']}">${escapeHtml(label)}: ${escapeHtml(status)}</span>`; }
+    async function runServerChecks() { const grid = document.getElementById('checksGrid'); grid.innerHTML='<div class="panel p-4 text-sm text-[#c6c5d7]">Running checks…</div>'; try { const res = await fetch('/api/servers/check'); const payload = await res.json(); grid.innerHTML = payload.results.length ? '' : '<div class="panel p-4 text-sm text-[#8f8fa0]">No servers configured.</div>'; payload.results.forEach((item) => { const row = document.createElement('div'); row.className='rounded-[20px] bg-[#0f1217] p-4'; row.innerHTML = `<div class="flex flex-wrap items-center justify-between gap-3"><h3 class="text-sm font-bold">${escapeHtml(item.alias)}</h3><div class="flex flex-wrap gap-2">${badge('SSH', item.ssh)}${badge('Sudo', item.sudo)}${badge('Docker', item.docker)}${badge('Known Host', item.known_host)}${badge('Backup', item.backup)}</div></div>${item.message ? `<p class="mt-3 text-xs text-[#c6c5d7]">${escapeHtml(item.message)}</p>` : ''}`; grid.appendChild(row); }); } catch (error) { grid.innerHTML = `<div class="panel p-4 text-sm text-[#ffb4ab]">Failed to run checks: ${escapeHtml(error.message)}</div>`; } }
+    async function refreshOverview() { const grid = document.getElementById('overviewGrid'); const status = document.getElementById('overviewStatus'); status.textContent='Loading…'; try { const res = await fetch('/api/servers/overview'); const payload = await res.json(); grid.innerHTML = payload.results.length ? '' : '<div class="panel p-8 text-center text-[#8f8fa0]">No servers configured.</div>'; payload.results.forEach((item) => { const card = document.createElement('div'); card.className='panel p-5'; card.innerHTML = `<div class="flex items-center justify-between gap-3"><div><h3 class="text-lg font-bold">${escapeHtml(item.alias)}</h3><p class="text-sm ${item.status === 'online' ? 'text-[#4ade80]' : 'text-[#ffb4ab]'}">${escapeHtml(item.status)}</p></div></div><div class="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">${[['CPU',item.cpu],['RAM',item.ram],['Disk',item.disk],['Uptime',item.uptime],['Docker',item.docker_count],['Last Backup Age',item.last_backup_age]].map(([label,val]) => `<div class="rounded-[18px] bg-[#0f1217] p-4"><p class="text-[11px] uppercase tracking-[0.18em] text-[#8f8fa0]">${escapeHtml(label)}</p><p class="mt-2 text-sm font-semibold">${escapeHtml(val)}</p></div>`).join('')}</div>${item.error ? `<p class="mt-3 text-xs text-[#ffb4ab]">${escapeHtml(item.error)}</p>` : ''}`; grid.appendChild(card); }); status.textContent=`Updated ${new Date().toLocaleTimeString()}`; } catch (error) { grid.innerHTML = `<div class="panel p-8 text-center text-[#ffb4ab]">Failed to load observability: ${escapeHtml(error.message)}</div>`; status.textContent='Unavailable'; } }
+    function downloadBackup() { window.location.href = '/api/backup/export'; }
+    async function restoreBackup(event) { const file = event.target.files[0]; if (!file) return; const formData = new FormData(); formData.append('backup_file', file); try { const res = await fetch('/api/backup/restore', { method:'POST', headers:{'X-CSRF-Token':csrfToken}, body:formData }); const payload = await res.json(); if (!res.ok) throw new Error(payload.detail || 'Restore failed'); setStatus(`Backup restored. ${payload.restored_servers} servers loaded.`); window.location.reload(); } catch (error) { setStatus(`Restore failed: ${error.message}`, true); } finally { event.target.value = ''; } }
+    renderServers(); fetchLogs(); fetchAuditLogs(); refreshOverview(); runServerChecks(); setInterval(fetchLogs, 5000); setInterval(fetchAuditLogs, 10000);
+  </script>
 </body>
 </html>
