@@ -16,7 +16,7 @@ from starlette.middleware.sessions import SessionMiddleware
 from app_state import AppState
 from auth_utils import hash_password
 from auth_utils import verify_password
-from models import AppConfig, RestoreConfigResponse, SaveConfigRequest, SetupRequest, TestServerRequest
+from models import AppConfig, RestoreConfigResponse, SaveConfigRequest, TestServerRequest
 
 
 def create_web_app(state: AppState) -> FastAPI:
