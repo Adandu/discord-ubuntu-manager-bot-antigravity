@@ -21,14 +21,17 @@ class LoginRateLimiter:
     def __init__(self, max_attempts: int = 5, window_seconds: int = 60):
         self.max_attempts = max_attempts
         self.window_seconds = window_seconds
-        self._attempts: dict[str, list[float]] = defaultdict(list)
+        self._attempts: dict[str, deque[float]] = defaultdict(deque)
 
     def is_allowed(self, key: str) -> bool:
         now = time.time()
-        self._attempts[key] = [t for t in self._attempts[key] if now - t < self.window_seconds]
-        if len(self._attempts[key]) >= self.max_attempts:
+        attempts = self._attempts[key]
+        while attempts and now - attempts[0] >= self.window_seconds:
+            attempts.popleft()
+
+        if len(attempts) >= self.max_attempts:
             return False
-        self._attempts[key].append(now)
+        attempts.append(now)
         return True
 
     def reset(self, key: str) -> None:
