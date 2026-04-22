@@ -359,20 +359,42 @@ class SSHManager:
             return status
         status["ssh"] = "ok"
 
-        sudo_output = self.execute_command(alias, "sudo -n true")
-        if "SSH Error" not in sudo_output and "not allowed" not in sudo_output.lower() and "password is required" not in sudo_output.lower():
-            status["sudo"] = "ok"
-        else:
-            status["message"] = sudo_output
+        # Batch checks into a single command to avoid N+1 SSH connections
+        command = "echo '---RESULTS---';"
 
+        # Check sudo
+        command += " if sudo -n true 2>&1 | grep -q -e 'not allowed' -e 'password is required'; then echo 'sudo_status=fail'; else echo 'sudo_status=ok'; fi;"
+
+        # Check docker
         if include_docker:
-            docker_output = self.execute_command(alias, "sudo docker ps -q | wc -l")
-            status["docker"] = "ok" if "SSH Error" not in docker_output and "command not found" not in docker_output.lower() else "fail"
+            command += " if command -v docker >/dev/null 2>&1 && sudo docker ps -q >/dev/null 2>&1; then echo 'docker_status=ok'; else echo 'docker_status=fail'; fi;"
 
+        # Check backup path
         if backup_path:
             safe_path = shlex.quote(backup_path)
-            backup_output = self.execute_command(alias, f"test -e {safe_path} && echo ok || echo missing")
-            status["backup"] = "ok" if backup_output.strip() == "ok" else "missing"
+            command += f" if test -e {safe_path}; then echo 'backup_status=ok'; else echo 'backup_status=missing'; fi;"
+
+        output = self.execute_command(alias, command)
+
+        if "SSH Error" in output:
+            status["message"] = output
+            return status
+
+        lines = output.split('\n')
+        for line in lines:
+            if 'sudo_status=ok' in line:
+                status["sudo"] = "ok"
+            elif 'sudo_status=fail' in line:
+                status["sudo"] = "fail"
+                status["message"] = "Sudo failed or requires password"
+            elif 'docker_status=ok' in line:
+                status["docker"] = "ok"
+            elif 'docker_status=fail' in line:
+                status["docker"] = "fail"
+            elif 'backup_status=ok' in line:
+                status["backup"] = "ok"
+            elif 'backup_status=missing' in line:
+                status["backup"] = "missing"
 
         return status
 
