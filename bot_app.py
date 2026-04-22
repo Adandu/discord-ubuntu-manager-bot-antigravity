@@ -139,46 +139,47 @@ def create_bot(state: AppState) -> DiscoBunty:
         if not check_permissions(state, interaction.user, server):
             raise app_commands.CheckFailure(f"User lacks access to server {server}")
 
-    async def server_autocomplete(interaction: discord.Interaction, current: str) -> list[app_commands.Choice[str]]:
+    async def _generic_autocomplete(
+        interaction: discord.Interaction,
+        current: str,
+        fetcher: callable,
+        require_server: bool = False,
+    ) -> list[app_commands.Choice[str]]:
         if not check_permissions(state, interaction.user):
             return []
-        aliases = sorted(
-            [alias for alias in state.ssh_manager.get_server_aliases() if check_permissions(state, interaction.user, alias)],
-            key=lambda value: value.lower(),
-        )
-        return [app_commands.Choice(name=alias, value=alias) for alias in aliases if current.lower() in alias.lower()]
+
+        if require_server:
+            server = interaction.namespace.server
+            if not server or not check_permissions(state, interaction.user, server):
+                return []
+
+        try:
+            items = await fetcher() if asyncio.iscoroutinefunction(fetcher) else fetcher()
+            return [
+                app_commands.Choice(name=item, value=item)
+                for item in sorted(items, key=lambda value: value.lower())
+                if current.lower() in item.lower()
+            ][:25]
+        except Exception:
+            return []
+
+    async def server_autocomplete(interaction: discord.Interaction, current: str) -> list[app_commands.Choice[str]]:
+        def fetcher():
+            return [alias for alias in state.ssh_manager.get_server_aliases() if check_permissions(state, interaction.user, alias)]
+
+        return await _generic_autocomplete(interaction, current, fetcher)
 
     async def container_autocomplete(interaction: discord.Interaction, current: str) -> list[app_commands.Choice[str]]:
-        if not check_permissions(state, interaction.user):
-            return []
-        server = interaction.namespace.server
-        if not server or not check_permissions(state, interaction.user, server):
-            return []
-        try:
-            containers = await asyncio.to_thread(state.ssh_manager.get_containers, server)
-            return [
-                app_commands.Choice(name=name, value=name)
-                for name in sorted(containers, key=lambda value: value.lower())
-                if current.lower() in name.lower()
-            ][:25]
-        except Exception:
-            return []
+        async def fetcher():
+            return await asyncio.to_thread(state.ssh_manager.get_containers, interaction.namespace.server)
+
+        return await _generic_autocomplete(interaction, current, fetcher, require_server=True)
 
     async def log_autocomplete(interaction: discord.Interaction, current: str) -> list[app_commands.Choice[str]]:
-        if not check_permissions(state, interaction.user):
-            return []
-        server = interaction.namespace.server
-        if not server or not check_permissions(state, interaction.user, server):
-            return []
-        try:
-            logs = await asyncio.to_thread(state.ssh_manager.get_log_files, server)
-            return [
-                app_commands.Choice(name=path, value=path)
-                for path in sorted(logs, key=lambda value: value.lower())
-                if current.lower() in path.lower()
-            ][:25]
-        except Exception:
-            return []
+        async def fetcher():
+            return await asyncio.to_thread(state.ssh_manager.get_log_files, interaction.namespace.server)
+
+        return await _generic_autocomplete(interaction, current, fetcher, require_server=True)
 
     @bot.tree.command(name="ping", description="Check bot latency")
     async def ping(interaction: discord.Interaction) -> None:
