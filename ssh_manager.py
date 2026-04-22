@@ -46,6 +46,7 @@ class SSHManager:
     def __init__(self, servers: List[Dict]):
         # Now initialized with the list from ConfigManager
         self.servers = servers
+        self.servers_by_alias = {s['alias']: s for s in servers}
         self._log_cache = {} # Cache for log file lists: {alias: (timestamp, [files])}
 
     def get_server_aliases(self) -> List[str]:
@@ -54,10 +55,7 @@ class SSHManager:
 
     def get_server_by_alias(self, alias: str) -> Optional[Dict]:
         """Find a server configuration by its alias."""
-        for s in self.servers:
-            if s['alias'] == alias:
-                return s
-        return None
+        return self.servers_by_alias.get(alias)
 
     def _get_ssh_client(self, config: Dict, trust_host: bool = False) -> Tuple[Optional[paramiko.SSHClient], Optional[str], Optional[str]]:
         """
