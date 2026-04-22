@@ -90,20 +90,21 @@ class AppState:
         self.logger.info("AUDIT: %s", log_entry.strip())
 
     def masked_config_dict(self) -> dict:
-        display_config = self.config.model_copy(deep=True).model_dump(by_alias=True)
-        if self.config.discord.token:
+        display_config = self.config.model_dump(by_alias=True)
+        if display_config["discord"].get("token"):
             display_config["discord"]["token"] = "********"
-        if self.config.webui.password:
+        if display_config["webui"].get("password"):
             display_config["webui"]["password"] = "********"
-        if self.config.features.power_control_password:
+        if display_config["features"].get("power_control_password"):
             display_config["features"]["power_control_password"] = "********"
 
         for server in display_config["servers"]:
             if server.get("password"):
                 server["password"] = "********"
             key_value = server.get("key", "")
-            if key_value and not (key_value.startswith("/") or os.path.isfile(key_value)):
-                server["key"] = "********"
+            if key_value and not key_value.startswith("/"):
+                if not os.path.isfile(key_value):
+                    server["key"] = "********"
 
         return display_config
 
