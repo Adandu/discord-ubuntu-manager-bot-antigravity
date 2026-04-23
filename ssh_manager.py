@@ -1,6 +1,7 @@
 import os
 import json
 import paramiko
+import re
 import io
 import logging
 import shlex
@@ -8,6 +9,9 @@ import time
 from typing import List, Dict, Optional, Tuple
 
 logger = logging.getLogger('discobunty.ssh')
+SUDO_PROMPT_PATTERN = re.compile(r'(?m)^.*\[sudo\] password for.*$\n?|^\s*Password:\s*$\n?')
+
+
 
 
 def _humanize_age_seconds(raw_value: str) -> str:
@@ -255,8 +259,7 @@ class SSHManager:
             error = stderr.read().decode('utf-8')
 
             if "[sudo] password for" in error or "Password:" in error:
-                lines = error.splitlines()
-                error = "\n".join([line for line in lines if "[sudo] password for" not in line and "Password:" != line.strip()]).strip()
+                error = SUDO_PROMPT_PATTERN.sub('', error).strip()
 
             if error and output:
                 return f"{output}\n[Error Output]\n{error}"
