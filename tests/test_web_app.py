@@ -39,7 +39,9 @@ class WebAppTests(unittest.TestCase):
         try:
             login_page = client.get("/login")
             self.assertEqual(login_page.status_code, 200)
-            csrf_token = login_page.text.split('name="csrf_token" value="', 1)[1].split('"', 1)[0]
+            csrf_token = login_page.text.split('name="csrf_token" value="', 1)[1].split(
+                '"', 1
+            )[0]
 
             response = client.post(
                 "/login",
@@ -68,16 +70,24 @@ class WebAppTests(unittest.TestCase):
 
             setup_page = client.get("/setup")
             self.assertEqual(setup_page.status_code, 200)
-            csrf_token = setup_page.text.split('name="csrf_token" value="', 1)[1].split('"', 1)[0]
+            csrf_token = setup_page.text.split('name="csrf_token" value="', 1)[1].split(
+                '"', 1
+            )[0]
 
             submit = client.post(
                 "/setup",
-                data={"password": "new-admin-pass", "confirm_password": "new-admin-pass", "csrf_token": csrf_token},
+                data={
+                    "password": "new-admin-pass",
+                    "confirm_password": "new-admin-pass",
+                    "csrf_token": csrf_token,
+                },
                 follow_redirects=False,
             )
             self.assertEqual(submit.status_code, 303)
             self.assertEqual(submit.headers["location"], "/")
-            self.assertTrue(state.config_manager.config.webui.password.startswith("PBKDF2_SHA256$"))
+            self.assertTrue(
+                state.config_manager.config.webui.password.startswith("PBKDF2_SHA256$")
+            )
         finally:
             client.close()
             patcher.stop()
@@ -87,10 +97,18 @@ class WebAppTests(unittest.TestCase):
         temp_dir, patcher, client, state = self._build_client()
         try:
             login_page = client.get("/login")
-            csrf_token = login_page.text.split('name="csrf_token" value="', 1)[1].split('"', 1)[0]
-            client.post("/login", data={"password": "admin-pass", "csrf_token": csrf_token}, follow_redirects=False)
+            csrf_token = login_page.text.split('name="csrf_token" value="', 1)[1].split(
+                '"', 1
+            )[0]
+            client.post(
+                "/login",
+                data={"password": "admin-pass", "csrf_token": csrf_token},
+                follow_redirects=False,
+            )
             home = client.get("/")
-            authed_csrf = home.text.split('meta name="csrf-token" content="', 1)[1].split('"', 1)[0]
+            authed_csrf = home.text.split('meta name="csrf-token" content="', 1)[
+                1
+            ].split('"', 1)[0]
 
             export = client.get("/api/backup/export")
             self.assertEqual(export.status_code, 200)
@@ -104,6 +122,80 @@ class WebAppTests(unittest.TestCase):
             )
             self.assertEqual(restored.status_code, 200)
             self.assertEqual(restored.json()["status"], "success")
+        finally:
+            client.close()
+            patcher.stop()
+            temp_dir.cleanup()
+
+    def test_csrf_validation_edge_cases(self):
+        temp_dir, patcher, client, _state = self._build_client()
+        try:
+            # Get the login page to initialize a session with a valid csrf_token
+            login_page = client.get("/login")
+            valid_csrf_token = login_page.text.split('name="csrf_token" value="', 1)[
+                1
+            ].split('"', 1)[0]
+
+            # --- validate_csrf_form edge cases ---
+
+            # 1. Invalid form token
+            response = client.post(
+                "/login", data={"password": "admin-pass", "csrf_token": "invalid_token"}
+            )
+            self.assertEqual(response.status_code, 403)
+            self.assertEqual(
+                response.json(), {"detail": "CSRF token missing or invalid"}
+            )
+
+            # 2. Missing form token (handled by FastAPI dependencies, returns 422 Unprocessable Entity)
+            response = client.post("/login", data={"password": "admin-pass"})
+            self.assertEqual(response.status_code, 422)
+
+            # 3. Missing session token (by clearing cookies on the client to simulate a new session without a token)
+            client.cookies.clear()
+            response = client.post(
+                "/login",
+                data={"password": "admin-pass", "csrf_token": valid_csrf_token},
+            )
+            self.assertEqual(response.status_code, 403)
+            self.assertEqual(
+                response.json(), {"detail": "CSRF token missing or invalid"}
+            )
+
+            # Re-authenticate to get a valid session for API calls
+            login_page = client.get("/login")
+            valid_csrf_token = login_page.text.split('name="csrf_token" value="', 1)[
+                1
+            ].split('"', 1)[0]
+            client.post(
+                "/login",
+                data={"password": "admin-pass", "csrf_token": valid_csrf_token},
+                follow_redirects=False,
+            )
+
+            # --- validate_csrf edge cases ---
+
+            # 1. Invalid header token
+            response = client.post(
+                "/api/backup/restore",
+                headers={"X-CSRF-Token": "invalid_token"},
+                files={"backup_file": ("backup.json", b"{}", "application/json")},
+            )
+            self.assertEqual(response.status_code, 403)
+            self.assertEqual(
+                response.json(), {"detail": "CSRF token missing or invalid"}
+            )
+
+            # 2. Missing header token
+            response = client.post(
+                "/api/backup/restore",
+                files={"backup_file": ("backup.json", b"{}", "application/json")},
+            )
+            self.assertEqual(response.status_code, 403)
+            self.assertEqual(
+                response.json(), {"detail": "CSRF token missing or invalid"}
+            )
+
         finally:
             client.close()
             patcher.stop()
