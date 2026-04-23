@@ -4,6 +4,7 @@ import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
+from pydantic import ValidationError
 
 from config_manager import ConfigManager
 from models import AppConfig
@@ -79,6 +80,30 @@ class ConfigManagerTests(unittest.TestCase):
             migrated = json.loads((data_dir / "config.json").read_text(encoding="utf-8"))
             self.assertTrue(migrated["webui"]["password"].startswith("PBKDF2_SHA256$"))
 
+    def test_import_raw_config_malformed_json(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            env = {"SECRET_KEY": "z" * 32, "DATA_DIR": temp_dir}
+            with patch.dict(os.environ, env, clear=False):
+                manager = ConfigManager()
+                with self.assertRaises(json.JSONDecodeError):
+                    manager.import_raw_config(b"invalid json")
+
+    def test_import_raw_config_invalid_schema(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            env = {"SECRET_KEY": "z" * 32, "DATA_DIR": temp_dir}
+            with patch.dict(os.environ, env, clear=False):
+                manager = ConfigManager()
+                # AppConfig doesn't throw ValidationError on just {"invalid": "schema"}
+                # because the fields have default_factory or defaults.
+                # Let's provide a dict that explicitly fails type validation
+                # such as an invalid auth_method
+                invalid_config = json.dumps({
+                    "servers": [
+                        {"alias": "srv1", "auth_method": "invalid_method"}
+                    ]
+                }).encode("utf-8")
+                with self.assertRaises(ValidationError):
+                    manager.import_raw_config(invalid_config)
 
 if __name__ == "__main__":
     unittest.main()
