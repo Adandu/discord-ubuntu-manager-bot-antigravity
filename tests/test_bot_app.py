@@ -51,6 +51,11 @@ class BotPermissionTests(unittest.TestCase):
         self.assertIn("deadbeef", message)
         self.assertNotIn("secret backend details", message)
 
+    def test_user_facing_error_message_check_failure(self):
+        error = app_commands.CheckFailure("check failed")
+        message = build_user_facing_error_message(error, "deadbeef")
+        self.assertEqual("❌ You do not have permission to use that command or access that server.", message)
+
 
 if __name__ == "__main__":
     unittest.main()
