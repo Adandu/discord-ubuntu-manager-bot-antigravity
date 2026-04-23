@@ -1,7 +1,7 @@
 import unittest
 import time
 import sys
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 # Mock dependencies that are not available in the environment to allow importing app_state
 # We use a context manager-like approach to patch sys.modules only during import
@@ -59,6 +59,46 @@ class TestLoginRateLimiter(unittest.TestCase):
 
         limiter.reset("user1")
         self.assertTrue(limiter.is_allowed("user1"))
+
+
+    @patch('time.time')
+    def test_exact_window_boundary(self, mock_time):
+        # Test that eviction happens exactly when `now - attempt[0] >= window_seconds`
+        limiter = LoginRateLimiter(max_attempts=2, window_seconds=10)
+
+        # t=0.0
+        mock_time.return_value = 0.0
+        self.assertTrue(limiter.is_allowed("user1"))
+        self.assertTrue(limiter.is_allowed("user1"))
+
+        # t=9.9 (limit reached, attempts not evicted)
+        mock_time.return_value = 9.9
+        self.assertFalse(limiter.is_allowed("user1"))
+
+        # t=10.0 (exact boundary, attempts from t=0.0 are evicted)
+        mock_time.return_value = 10.0
+        self.assertTrue(limiter.is_allowed("user1"))
+
+    @patch('time.time')
+    def test_multiple_evictions(self, mock_time):
+        limiter = LoginRateLimiter(max_attempts=3, window_seconds=10)
+
+        mock_time.return_value = 0.0
+        self.assertTrue(limiter.is_allowed("user1"))
+        mock_time.return_value = 2.0
+        self.assertTrue(limiter.is_allowed("user1"))
+        mock_time.return_value = 4.0
+        self.assertTrue(limiter.is_allowed("user1"))
+
+        # Limit reached
+        mock_time.return_value = 5.0
+        self.assertFalse(limiter.is_allowed("user1"))
+
+        # Move forward, evict first two attempts
+        mock_time.return_value = 13.0
+        self.assertTrue(limiter.is_allowed("user1"))
+        self.assertTrue(limiter.is_allowed("user1"))
+        self.assertFalse(limiter.is_allowed("user1"))
 
 if __name__ == "__main__":
     unittest.main()
