@@ -2,12 +2,24 @@ import unittest
 from types import SimpleNamespace
 
 from app_state import AppState
-from bot_app import build_user_facing_error_message, check_permissions, is_allowed_log_path
+from bot_app import _matches_roles, build_user_facing_error_message, check_permissions, is_allowed_log_path
 from discord import app_commands
 from models import AppConfig
 
 
 class BotPermissionTests(unittest.TestCase):
+    def test_matches_roles(self):
+        self.assertFalse(_matches_roles(["Admin"], ""))
+        self.assertFalse(_matches_roles(["Admin"], "   "))
+        self.assertFalse(_matches_roles(["Admin"], ","))
+        self.assertFalse(_matches_roles([], "Admin"))
+        self.assertTrue(_matches_roles(["Admin"], "Admin"))
+        self.assertTrue(_matches_roles(["Admin", "User"], "Admin"))
+        self.assertFalse(_matches_roles(["admin"], "Admin"))
+        self.assertTrue(_matches_roles(["User"], "Admin,User,Guest"))
+        self.assertTrue(_matches_roles(["Guest"], "Admin, User, Guest"))
+        self.assertFalse(_matches_roles(["Guest"], "Admin,User"))
+
     def test_server_role_scope_is_more_restrictive_than_global_roles(self):
         state = AppState.__new__(AppState)
         state.config = AppConfig.model_validate(
