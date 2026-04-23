@@ -1,0 +1,6 @@
+🧹 Refactor bot commands into Cogs to improve code health
+
+🎯 What: Refactored the deeply nested `create_bot` function in `bot_app.py` into a discord.ext.commands.Bot structure using `ServerManagementCog` and `DockerGroup`.
+💡 Why: The nested structure was highly complex and relied on capturing the global `state` variable inside closures. The new structure improves readability, separates concerns, and follows idiomatic discord.py patterns.
+✅ Verification: Ran the full test suite (`python3 -m unittest discover tests`), used `ruff check` and `ruff format` to ensure syntactical correctness, manually ran bot initialization tests, and completed a thorough code review.
+✨ Result: `bot_app.py` is now far easier to maintain without altering any existing behavior, access controls, or UI.
