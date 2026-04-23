@@ -1,6 +1,8 @@
 import os
 import json
 import paramiko
+import base64
+import hashlib
 import re
 import io
 import logging
@@ -46,6 +48,17 @@ def _humanize_age_seconds(raw_value: str) -> str:
         parts.append(f"{remainder}s")
     return " ".join(parts)
 
+
+class _FingerprintCapturePolicy(paramiko.MissingHostKeyPolicy):
+    def __init__(self):
+        self.key = None
+        self.fingerprint = None
+    def missing_host_key(self, client, hostname, key):
+        self.key = key
+        # Standard OpenSSH SHA256 format
+        self.fingerprint = "SHA256:" + base64.b64encode(hashlib.sha256(key.asbytes()).digest()).decode('utf-8').replace('=', '')
+        raise paramiko.SSHException(f"Host key verification failed for {hostname}")
+
 class SSHManager:
     def __init__(self, servers: List[Dict]):
         # Now initialized with the list from ConfigManager
@@ -61,36 +74,10 @@ class SSHManager:
         """Find a server configuration by its alias."""
         return self.servers_by_alias.get(alias)
 
-    def _get_ssh_client(self, config: Dict, trust_host: bool = False) -> Tuple[Optional[paramiko.SSHClient], Optional[str], Optional[str]]:
-        """
-        Internal helper to create and connect an SSH client.
-        Returns (client, error_message, fingerprint).
-        """
-        if not config:
-            return None, "Error: Invalid server configuration.", None
-
-        host = config.get('host')
-        user = config.get('user', 'root')
-        port = int(config.get('port', 22))
-        auth_method = config.get('auth_method', 'key')
-
-        client = paramiko.SSHClient()
+    def _configure_host_keys(self, client: paramiko.SSHClient, host: str, port: int, trust_host: bool) -> Tuple[bool, Optional[str], _FingerprintCapturePolicy]:
+        """Configure known_hosts and missing host key policy."""
         known_hosts_path = os.getenv('KNOWN_HOSTS_FILE', os.path.join(os.getenv('DATA_DIR', '/app/data'), 'known_hosts'))
-        
-        # 1. Fingerprint Capture Policy
-        class FingerprintCapturePolicy(paramiko.MissingHostKeyPolicy):
-            def __init__(self):
-                self.key = None
-                self.fingerprint = None
-            def missing_host_key(self, client, hostname, key):
-                self.key = key
-                # Standard OpenSSH SHA256 format
-                import base64
-                import hashlib
-                self.fingerprint = "SHA256:" + base64.b64encode(hashlib.sha256(key.asbytes()).digest()).decode('utf-8').replace('=', '')
-                raise paramiko.SSHException(f"Host key verification failed for {hostname}")
-
-        capture_policy = FingerprintCapturePolicy()
+        capture_policy = _FingerprintCapturePolicy()
         
         if trust_host:
             os.makedirs(os.path.dirname(known_hosts_path), exist_ok=True)
@@ -98,8 +85,6 @@ class SSHManager:
         if os.path.exists(known_hosts_path):
             try:
                 client.load_host_keys(known_hosts_path)
-                
-                # Check if host is already in known_hosts
                 host_keys = client.get_host_keys()
                 host_str = f"[{host}]:{port}" if port != 22 else host
                 
@@ -115,39 +100,74 @@ class SSHManager:
                 logger.info(f"Loaded known_hosts from {known_hosts_path}")
             except Exception as e:
                 logger.error(f"Failed to load known_hosts: {e}")
-                return None, f"Error: Failed to load SSH known_hosts from {known_hosts_path}.", None
+                return False, f"Error: Failed to load SSH known_hosts from {known_hosts_path}.", capture_policy
         else:
             if trust_host:
                 client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
             else:
                 client.set_missing_host_key_policy(capture_policy)
 
-        try:
-            if auth_method == 'key':
-                key_value = config.get('key')
-                if not key_value:
-                    return None, "Error: SSH Key not provided.", None
+        return True, known_hosts_path, capture_policy
 
-                if key_value.startswith('/') or (os.path.exists(key_value) and os.path.isfile(key_value)):
-                    client.connect(hostname=host, port=port, username=user, key_filename=key_value, timeout=10)
-                else:
-                    private_key = None
-                    for key_class in [paramiko.RSAKey, paramiko.Ed25519Key, paramiko.ECDSAKey, paramiko.DSSKey]:
-                        try:
-                            private_key = key_class.from_private_key(io.StringIO(key_value))
-                            if private_key: break
-                        except Exception: continue
-                    
-                    if not private_key:
-                        return None, "Error: Could not parse SSH key string.", None
-                    
-                    client.connect(hostname=host, port=port, username=user, pkey=private_key, timeout=10)
+    def _connect_client(self, client: paramiko.SSHClient, config: Dict, host: str, port: int, user: str) -> Optional[str]:
+        """Handle SSH authentication and connection."""
+        auth_method = config.get('auth_method', 'key')
+
+        if auth_method == 'key':
+            key_value = config.get('key')
+            if not key_value:
+                return "Error: SSH Key not provided."
+
+            if key_value.startswith('/') or (os.path.exists(key_value) and os.path.isfile(key_value)):
+                client.connect(hostname=host, port=port, username=user, key_filename=key_value, timeout=10)
             else:
-                password = config.get('password')
-                if not password:
-                    return None, "Error: Password not provided.", None
-                client.connect(hostname=host, port=port, username=user, password=password, timeout=10)
+                private_key = None
+                for key_class in [paramiko.RSAKey, paramiko.Ed25519Key, paramiko.ECDSAKey, paramiko.DSSKey]:
+                    try:
+                        private_key = key_class.from_private_key(io.StringIO(key_value))
+                        if private_key: break
+                    except Exception: continue
+
+                if not private_key:
+                    return "Error: Could not parse SSH key string."
+
+                client.connect(hostname=host, port=port, username=user, pkey=private_key, timeout=10)
+        else:
+            password = config.get('password')
+            if not password:
+                return "Error: Password not provided."
+            client.connect(hostname=host, port=port, username=user, password=password, timeout=10)
+
+        return None
+
+    def _get_ssh_client(self, config: Dict, trust_host: bool = False) -> Tuple[Optional[paramiko.SSHClient], Optional[str], Optional[str]]:
+        """
+        Internal helper to create and connect an SSH client.
+        Returns (client, error_message, fingerprint).
+        """
+        if not config:
+            return None, "Error: Invalid server configuration.", None
+
+        host = config.get('host')
+        user = config.get('user', 'root')
+        port = int(config.get('port', 22))
+
+        client = paramiko.SSHClient()
+
+        # Configure host keys
+        success, host_keys_info, capture_policy = self._configure_host_keys(client, host, port, trust_host)
+        if not success:
+            return None, host_keys_info, None
+
+        known_hosts_path = host_keys_info
+
+        try:
+            # Connect
+            err = self._connect_client(client, config, host, port, user)
+            if err:
+                return None, err, None
             
+            # Save host keys if trusted
             if trust_host:
                 try:
                     client.save_host_keys(known_hosts_path)
@@ -160,8 +180,6 @@ class SSHManager:
             return client, None, None
         except paramiko.BadHostKeyException as e:
             # Capture the new fingerprint even on mismatch for display
-            import base64
-            import hashlib
             new_fp = "SHA256:" + base64.b64encode(hashlib.sha256(e.key.asbytes()).digest()).decode('utf-8').replace('=', '')
             return None, "Host key mismatch", new_fp
         except paramiko.SSHException as e:
