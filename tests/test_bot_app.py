@@ -2,7 +2,7 @@ import unittest
 from types import SimpleNamespace
 
 from app_state import AppState
-from bot_app import _matches_roles, build_user_facing_error_message, check_permissions, is_allowed_log_path
+from bot_app import _matches_roles, build_user_facing_error_message, check_permissions, is_allowed_log_path, is_admin
 from discord import app_commands
 from models import AppConfig
 
@@ -19,6 +19,24 @@ class BotPermissionTests(unittest.TestCase):
         self.assertTrue(_matches_roles(["User"], "Admin,User,Guest"))
         self.assertTrue(_matches_roles(["Guest"], "Admin, User, Guest"))
         self.assertFalse(_matches_roles(["Guest"], "Admin,User"))
+
+    def test_is_admin_check(self):
+        state = AppState.__new__(AppState)
+        state.config = AppConfig.model_validate({"discord": {"allowed_roles": "Admin"}})
+
+        @is_admin(state)
+        async def dummy_command(interaction):
+            pass
+
+        checks = getattr(dummy_command, "__discord_app_commands_checks__", [])
+        self.assertEqual(len(checks), 1)
+        predicate = checks[0]
+
+        allowed_interaction = SimpleNamespace(user=SimpleNamespace(roles=[SimpleNamespace(name="Admin")]))
+        denied_interaction = SimpleNamespace(user=SimpleNamespace(roles=[SimpleNamespace(name="User")]))
+
+        self.assertTrue(predicate(allowed_interaction))
+        self.assertFalse(predicate(denied_interaction))
 
     def test_server_role_scope_is_more_restrictive_than_global_roles(self):
         state = AppState.__new__(AppState)
