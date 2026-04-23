@@ -127,6 +127,218 @@ class WebAppTests(unittest.TestCase):
             patcher.stop()
             temp_dir.cleanup()
 
+
+    def test_save_config_ui_authentication(self):
+        temp_dir, patcher, client, _state = self._build_client()
+        try:
+            # Unauthenticated should return 401
+            response = client.post("/save", json={"discord": {"token": "test"}})
+            self.assertEqual(response.status_code, 401)
+        finally:
+            client.close()
+            patcher.stop()
+            temp_dir.cleanup()
+
+    def test_save_config_ui_secret_key_rejection(self):
+        temp_dir, patcher, client, _state = self._build_client()
+        try:
+            # Login first
+            login_page = client.get("/login")
+            csrf_token = login_page.text.split('name="csrf_token" value="', 1)[1].split('"', 1)[0]
+            client.post(
+                "/login",
+                data={"password": "admin-pass", "csrf_token": csrf_token},
+                follow_redirects=False,
+            )
+            home = client.get("/")
+            authed_csrf = home.text.split('meta name="csrf-token" content="', 1)[1].split('"', 1)[0]
+
+            # Setup original state config with test values after login to avoid messing up auth
+            _state.config.discord.token = "original_token"
+            _state.config.webui.password = "original_password"
+            _state.config.features.power_control_password = "original_power_password"
+
+            from models import ServerSettings
+            _state.config.servers = [ServerSettings(alias="test_server", ip="127.0.0.1", user="test", password="original_server_password", key="original_server_key")]
+            _state.save_config(_state.config)
+            original_webui_hash = _state.config.webui.password
+            original_power_hash = _state.config.features.power_control_password
+
+
+            payload = _state.config.model_dump()
+            payload["SECRET_KEY"] = "new_secret"
+
+            response = client.post(
+                "/save",
+                headers={"X-CSRF-Token": authed_csrf},
+                json=payload
+            )
+            self.assertEqual(response.status_code, 400)
+            self.assertEqual(response.json()["detail"], "SECRET_KEY rotation is not supported from the WebUI.")
+        finally:
+            client.close()
+            patcher.stop()
+            temp_dir.cleanup()
+
+    def test_save_config_ui_preserves_secrets(self):
+        temp_dir, patcher, client, _state = self._build_client()
+        try:
+            # Login
+            login_page = client.get("/login")
+            csrf_token = login_page.text.split('name="csrf_token" value="', 1)[1].split('"', 1)[0]
+            client.post(
+                "/login",
+                data={"password": "admin-pass", "csrf_token": csrf_token},
+                follow_redirects=False,
+            )
+            home = client.get("/")
+            authed_csrf = home.text.split('meta name="csrf-token" content="', 1)[1].split('"', 1)[0]
+
+            # Setup original state config with test values after login to avoid messing up auth
+            _state.config.discord.token = "original_token"
+            _state.config.webui.password = "original_password"
+            _state.config.features.power_control_password = "original_power_password"
+
+            from models import ServerSettings
+            _state.config.servers = [ServerSettings(alias="test_server", ip="127.0.0.1", user="test", password="original_server_password", key="original_server_key")]
+            _state.save_config(_state.config)
+            original_webui_hash = _state.config.webui.password
+            original_power_hash = _state.config.features.power_control_password
+
+
+            payload = _state.config.model_dump()
+            payload["discord"]["token"] = "********"
+            payload["webui"]["password"] = "********"
+            payload["features"]["power_control_password"] = "********"
+            payload["servers"][0]["password"] = "********"
+            payload["servers"][0]["key"] = "********"
+
+            response = client.post(
+                "/save",
+                headers={"X-CSRF-Token": authed_csrf},
+                json=payload
+            )
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response.json()["status"], "success")
+
+            # Verify secrets are preserved
+            self.assertEqual(_state.config.discord.token, "original_token")
+            self.assertEqual(_state.config.webui.password, original_webui_hash)
+            self.assertEqual(_state.config.features.power_control_password, original_power_hash)
+            self.assertEqual(_state.config.servers[0].password, "original_server_password")
+            self.assertEqual(_state.config.servers[0].key, "original_server_key")
+
+        finally:
+            client.close()
+            patcher.stop()
+            temp_dir.cleanup()
+
+    def test_save_config_ui_rate_limiting(self):
+        temp_dir, patcher, client, _state = self._build_client()
+        try:
+            # Login
+            login_page = client.get("/login")
+            csrf_token = login_page.text.split('name="csrf_token" value="', 1)[1].split('"', 1)[0]
+            client.post(
+                "/login",
+                data={"password": "admin-pass", "csrf_token": csrf_token},
+                follow_redirects=False,
+            )
+            home = client.get("/")
+            authed_csrf = home.text.split('meta name="csrf-token" content="', 1)[1].split('"', 1)[0]
+
+            # Setup original state config with test values after login to avoid messing up auth
+            _state.config.discord.token = "original_token"
+            _state.config.webui.password = "original_password"
+            _state.config.features.power_control_password = "original_power_password"
+
+            from models import ServerSettings
+            _state.config.servers = [ServerSettings(alias="test_server", ip="127.0.0.1", user="test", password="original_server_password", key="original_server_key")]
+            _state.save_config(_state.config)
+            original_webui_hash = _state.config.webui.password
+            original_power_hash = _state.config.features.power_control_password
+
+
+            payload = _state.config.model_dump()
+
+            # Make enough requests to trigger rate limit
+            # According to `api_limiter` setup, we might need 10 requests within a second (depends on how state is configured)
+            # Default rate limit is usually 5 req/min. Let's just make 10 fast requests.
+            for i in range(40):
+                response = client.post(
+                    "/save",
+                    headers={"X-CSRF-Token": authed_csrf},
+                    json=payload
+                )
+                if response.status_code == 429:
+
+
+                    self.assertEqual(response.json()["detail"], "Too many requests. Please wait before saving again.")
+                    break
+            else:
+                self.fail("Rate limiting did not trigger")
+
+        finally:
+            client.close()
+            patcher.stop()
+            temp_dir.cleanup()
+
+    def test_save_config_ui_server_renaming(self):
+        temp_dir, patcher, client, _state = self._build_client()
+        try:
+            from models import ServerSettings
+            _state.config.servers = [ServerSettings(alias="test_server", ip="127.0.0.1", user="test", password="original_server_password", key="original_server_key")]
+            _state.save_config(_state.config)
+            original_webui_hash = _state.config.webui.password
+            original_power_hash = _state.config.features.power_control_password
+
+            # Login
+            login_page = client.get("/login")
+            csrf_token = login_page.text.split('name="csrf_token" value="', 1)[1].split('"', 1)[0]
+            client.post(
+                "/login",
+                data={"password": "admin-pass", "csrf_token": csrf_token},
+                follow_redirects=False,
+            )
+            home = client.get("/")
+            authed_csrf = home.text.split('meta name="csrf-token" content="', 1)[1].split('"', 1)[0]
+
+            # Setup original state config with test values after login to avoid messing up auth
+            _state.config.discord.token = "original_token"
+            _state.config.webui.password = "original_password"
+            _state.config.features.power_control_password = "original_power_password"
+
+            from models import ServerSettings
+            _state.config.servers = [ServerSettings(alias="test_server", ip="127.0.0.1", user="test", password="original_server_password", key="original_server_key")]
+            _state.save_config(_state.config)
+            original_webui_hash = _state.config.webui.password
+            original_power_hash = _state.config.features.power_control_password
+
+
+            payload = _state.config.model_dump()
+            payload["servers"][0]["alias"] = "new_test_server"
+            payload["servers"][0]["_original_alias"] = "test_server"
+            payload["servers"][0]["password"] = "********"
+            payload["servers"][0]["key"] = "********"
+
+            response = client.post(
+                "/save",
+                headers={"X-CSRF-Token": authed_csrf},
+                json=payload
+            )
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response.json()["status"], "success")
+
+            # Verify secrets are preserved and server renamed
+            self.assertEqual(_state.config.servers[0].alias, "new_test_server")
+            self.assertEqual(_state.config.servers[0].password, "original_server_password")
+            self.assertEqual(_state.config.servers[0].key, "original_server_key")
+
+        finally:
+            client.close()
+            patcher.stop()
+            temp_dir.cleanup()
+
     def test_csrf_validation_edge_cases(self):
         temp_dir, patcher, client, _state = self._build_client()
         try:

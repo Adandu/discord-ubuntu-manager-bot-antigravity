@@ -72,7 +72,7 @@ class TestServerRequest(ServerSettings):
 
 
 class SaveConfigRequest(AppConfig):
-    pass
+    model_config = ConfigDict(extra="allow")
 
 
 class SetupRequest(BaseModel):
