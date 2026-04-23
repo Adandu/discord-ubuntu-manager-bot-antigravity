@@ -5,9 +5,12 @@ import io
 import logging
 import shlex
 import time
+import re
 from typing import List, Dict, Optional, Tuple
 
 logger = logging.getLogger('discobunty.ssh')
+
+SUDO_PROMPT_PATTERN = re.compile(r"\[sudo\] password for .+: |Password: ", re.IGNORECASE)
 
 
 def _humanize_age_seconds(raw_value: str) -> str:
@@ -182,45 +185,46 @@ class SSHManager:
         except Exception as e:
             return False, f"Error closing connection: {str(e)}", None
 
-    def execute_command(self, alias: str, command: str) -> str:
-        """Connect to a server by alias and execute a command with sudo and path resolution."""
-        config = self.get_server_by_alias(alias)
-        client, err, _ = self._get_ssh_client(config)
-        if err:
-            logger.error(f"SSH Connection Error on '{alias}': {err}")
-            return f"SSH Error: {err}"
+    def _prepare_command(self, command: str, config: Dict) -> Tuple[str, Optional[str]]:
+        """Prepare command with Synology/DSM Path Fix and return (command_to_run, password_to_send)."""
+        user = config.get('user', 'root')
+        password = config.get('password')
+        path_list = "/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
 
-        try:
-            # Handle sudo for non-root users if a password is available
-            user = config.get('user', 'root')
-            password = config.get('password')
-            
+        command = command.strip()
+
+        if user != 'root' and command.startswith('sudo ') and password:
+            cmd_body = command[5:].strip()
             # Synology/DSM Path Fix: use 'env' to set PATH without sh -c expansion risks
-            path_list = "/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+            command_to_run = f'sudo -S -E env PATH="$PATH:{path_list}" {cmd_body}'
+            return command_to_run, password
+        else:
+            # For non-sudo or root, still use env to set PATH
+            command_to_run = f'env PATH="$PATH:{path_list}" {command}'
+            return command_to_run, None
 
-            if user != 'root' and command.startswith('sudo ') and password:
-                # Rebuild command using: sudo -S -E env PATH=$PATH:... command
-                cmd_body = command[5:] # remove 'sudo '
-                command_to_run = f'sudo -S -E env PATH="$PATH:{path_list}" {cmd_body}'
-                stdin, stdout, stderr = client.exec_command(command_to_run, timeout=60)
+    def _execute_internal(self, client: paramiko.SSHClient, config: Dict, command: str, alias: str) -> str:
+        """Centralized helper for command preparation and execution."""
+        try:
+            command_to_run, password = self._prepare_command(command, config)
+            
+            stdin, stdout, stderr = client.exec_command(command_to_run, timeout=60)
+            if password:
                 stdin.write(password + '\n')
                 stdin.flush()
-            else:
-                command_to_run = f'env PATH="$PATH:{path_list}" {command}'
-                stdin, stdout, stderr = client.exec_command(command_to_run, timeout=60)
 
             output = stdout.read().decode('utf-8')
             error = stderr.read().decode('utf-8')
 
             # Clean up sudo password prompt from error output
             if "[sudo] password for" in error or "Password:" in error:
-                lines = error.splitlines()
-                error = "\n".join([l for l in lines if "[sudo] password for" not in l and "Password:" != l.strip()]).strip()
+                error = SUDO_PROMPT_PATTERN.sub('', error).strip()
 
             if error and output:
                 return f"{output}\n[Error Output]\n{error}"
             elif error:
-                logger.warning(f"Command on '{alias}' produced error output: {error.strip()}")
+                if error.strip():
+                    logger.warning(f"Command on '{alias}' produced error output: {error.strip()}")
                 return error
             
             return output
@@ -228,6 +232,20 @@ class SSHManager:
             err_msg = f"SSH Execution Error on '{alias}': {str(e)}"
             logger.error(err_msg)
             return err_msg
+
+    def execute_command(self, alias: str, command: str) -> str:
+        """Connect to a server by alias and execute a command with sudo and path resolution."""
+        config = self.get_server_by_alias(alias)
+        if not config:
+            return f"SSH Error: Server alias '{alias}' not found."
+
+        client, err, _ = self._get_ssh_client(config)
+        if err:
+            logger.error(f"SSH Connection Error on '{alias}': {err}")
+            return f"SSH Error: {err}"
+
+        try:
+            return self._execute_internal(client, config, command, alias)
         finally:
             client.close()
 
@@ -239,36 +257,7 @@ class SSHManager:
             return f"SSH Error: {err}"
 
         try:
-            user = config.get('user', 'root')
-            password = config.get('password')
-            path_list = "/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
-
-            if user != 'root' and command.startswith('sudo ') and password:
-                cmd_body = command[5:]
-                command_to_run = f'sudo -S -E env PATH="$PATH:{path_list}" {cmd_body}'
-                stdin, stdout, stderr = client.exec_command(command_to_run, timeout=60)
-                stdin.write(password + '\n')
-                stdin.flush()
-            else:
-                command_to_run = f'env PATH="$PATH:{path_list}" {command}'
-                stdin, stdout, stderr = client.exec_command(command_to_run, timeout=60)
-
-            output = stdout.read().decode('utf-8')
-            error = stderr.read().decode('utf-8')
-
-            if "[sudo] password for" in error or "Password:" in error:
-                lines = error.splitlines()
-                error = "\n".join([line for line in lines if "[sudo] password for" not in line and "Password:" != line.strip()]).strip()
-
-            if error and output:
-                return f"{output}\n[Error Output]\n{error}"
-            if error:
-                return error
-            return output
-        except Exception as e:
-            err_msg = f"SSH Execution Error on '{alias}': {str(e)}"
-            logger.error(err_msg)
-            return err_msg
+            return self._execute_internal(client, config, command, alias)
         finally:
             client.close()
 
@@ -463,7 +452,7 @@ class SSHManager:
         return output.strip()
 
     def server_power_action(self, alias: str, action: str) -> str:
-        """Perform reboot or shutdown on a specific Ubuntu server."""
+        """Perform reboot or shutdown on a specific server."""
         if action not in ["reboot", "shutdown"]:
             return f"Error: Invalid action '{action}'. Use 'reboot' or 'shutdown'."
             
@@ -471,15 +460,27 @@ class SSHManager:
         logger.info(f"Initiating {action} on '{alias}' via command: {cmd}")
         
         config = self.get_server_by_alias(alias)
+        if not config:
+            return f"Error: Server alias '{alias}' not found."
+
         client, err, _ = self._get_ssh_client(config)
         if err:
             logger.error(f"SSH Connection Error for {action} on '{alias}': {err}")
             return f"SSH Error: {err}"
 
         try:
-            transport = client.get_transport()
-            channel = transport.open_session()
-            channel.exec_command(cmd)
+            command_to_run, password = self._prepare_command(cmd, config)
+
+            # For power actions, we use exec_command but don't wait for completion
+            # as the server will likely disconnect us.
+            stdin, stdout, stderr = client.exec_command(command_to_run, timeout=10)
+            if password:
+                stdin.write(password + '\n')
+                stdin.flush()
+
+            # Short sleep to allow the command to be processed by the remote shell
+            time.sleep(1)
+
             return f"✅ Command `{cmd}` sent to `{alias}`. Server is {action}ing..."
         except Exception as e:
             if "EOFError" in str(type(e)) or "Connection reset" in str(e):
