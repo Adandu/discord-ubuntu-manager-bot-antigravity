@@ -95,7 +95,8 @@ class ConfigManager:
         i = 1
         while True:
             alias = os.getenv(f'DISCORD_UBUNTU_SERVER_ALIAS_{i}')
-            if not alias: break
+            if not alias:
+                break
             
             server = {
                 "alias": alias,
@@ -121,7 +122,10 @@ class ConfigManager:
         # Process Discord Token (Critical fix: Discord token is now encrypted)
         if "discord" in config and config["discord"].get("token"):
             t = config["discord"]["token"]
-            config["discord"]["token"] = self.crypto.decrypt(t) if decrypt else self.crypto.encrypt(t)
+            if decrypt:
+                config["discord"]["token"] = self.crypto.decrypt(t) if t.startswith("ENC:") else t
+            else:
+                config["discord"]["token"] = self.crypto.encrypt(t) if not t.startswith("ENC:") else t
 
         # Process top-level passwords
         def _process_section_password(section: str, key: str):
