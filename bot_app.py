@@ -32,7 +32,7 @@ def check_permissions(state: AppState, user, server_alias: str | None = None) ->
     if not server_alias:
         return True
 
-    server = next((candidate for candidate in state.config.servers if candidate.alias == server_alias), None)
+    server = getattr(state, "servers_by_alias", {}).get(server_alias)
     if not server or not server.allowed_roles.strip():
         return True
     return _matches_roles(user_roles, server.allowed_roles)

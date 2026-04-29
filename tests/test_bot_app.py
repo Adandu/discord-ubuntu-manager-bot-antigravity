@@ -49,6 +49,7 @@ class BotPermissionTests(unittest.TestCase):
                 ],
             }
         )
+        state.servers_by_alias = {s.alias: s for s in state.config.servers}
         user = SimpleNamespace(roles=[SimpleNamespace(name="Admin")])
         sre_user = SimpleNamespace(roles=[SimpleNamespace(name="Admin"), SimpleNamespace(name="SRE")])
 

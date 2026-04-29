@@ -75,6 +75,7 @@ class AppState:
     def refresh_runtime(self) -> None:
         self.config: AppConfig = self.config_manager.config
         self.ssh_manager = SSHManager([server.model_dump(by_alias=True) for server in self.config.servers])
+        self.servers_by_alias = {server.alias: server for server in self.config.servers}
 
     @property
     def audit_log_path(self) -> Path:
