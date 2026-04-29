@@ -105,5 +105,22 @@ class ConfigManagerTests(unittest.TestCase):
                 with self.assertRaises(ValidationError):
                     manager.import_raw_config(invalid_config)
 
+    @patch("config_manager.logger.error")
+    @patch("builtins.open", side_effect=PermissionError("Permission denied"))
+    def test_save_config_handles_exception(self, mock_open, mock_logger_error):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            env = {"SECRET_KEY": "z" * 32, "DATA_DIR": temp_dir}
+            with patch.dict(os.environ, env, clear=False):
+                manager = ConfigManager()
+                config = AppConfig.model_validate(manager.config.model_dump())
+
+                # Should not raise an exception
+                manager.save_config(config)
+
+                # Verify logger.error was called with the correct message
+                mock_logger_error.assert_called()
+                args, _ = mock_logger_error.call_args_list[-1]
+                self.assertIn("Failed to save", args[0])
+                self.assertIn("Permission denied", args[0])
 if __name__ == "__main__":
     unittest.main()
