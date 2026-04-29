@@ -15,5 +15,26 @@ class AuthUtilsTests(unittest.TestCase):
         self.assertFalse(verify_password("legacy", "different"))
 
 
+
+
+    def test_verify_password_empty_inputs(self):
+        self.assertFalse(verify_password("", "hash"))
+        self.assertFalse(verify_password("cand", ""))
+        self.assertFalse(verify_password(None, "hash"))
+        self.assertFalse(verify_password("cand", None))
+        self.assertFalse(verify_password("", ""))
+        self.assertFalse(verify_password(None, None))
+
+    def test_verify_password_malformed_hash(self):
+        from auth_utils import PASSWORD_HASH_PREFIX
+        # Missing parts
+        self.assertFalse(verify_password("pass", f"{PASSWORD_HASH_PREFIX}$invalid"))
+        # Invalid iterations
+        self.assertFalse(verify_password("pass", f"{PASSWORD_HASH_PREFIX}$not_an_int$salt$digest"))
+        # Invalid base64 salt
+        self.assertFalse(verify_password("pass", f"{PASSWORD_HASH_PREFIX}$1000$salt$$digest"))
+        # Invalid base64 digest
+        self.assertFalse(verify_password("pass", f"{PASSWORD_HASH_PREFIX}$1000$c2FsdA==$dig$$est"))
+
 if __name__ == "__main__":
     unittest.main()
