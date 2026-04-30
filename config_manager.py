@@ -119,7 +119,7 @@ class ConfigManager:
 
     def _process_config(self, config: dict, decrypt: bool = True) -> dict:
         """Recursively encrypt or decrypt passwords in the config."""
-        # Process Discord Token (Critical fix: Discord token is now encrypted)
+        # Process Discord Token
         if "discord" in config and config["discord"].get("token"):
             t = config["discord"]["token"]
             if decrypt:
