@@ -1,6 +1,0 @@
-🧹 [Code Health] Refactor check_server_capabilities in SSHManager
-
-🎯 **What:** Extracted the bash command generation and the command output parsing logic out of `check_server_capabilities` into two new helper methods: `_build_capabilities_command` and `_parse_capabilities_output`.
-💡 **Why:** `check_server_capabilities` had become too long and complex, handling its own command generation, execution, and string parsing. Breaking these out improves readability and allows for future reusability and easier unit testing of these discrete pieces of logic.
-✅ **Verification:** Verified by running the test suite (`PYTHONPATH=. python3 -m unittest tests.test_ssh_manager`). All tests continue to pass indicating no regression in behavior. Evaluated code via automated code review tool successfully.
-✨ **Result:** A more readable, maintainable `check_server_capabilities` function.

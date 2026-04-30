@@ -156,6 +156,7 @@ class SSHManager:
         # Configure host keys
         success, host_keys_info, capture_policy = self._configure_host_keys(client, host, port, trust_host)
         if not success:
+            client.close()
             return None, host_keys_info, None
 
         known_hosts_path = host_keys_info
@@ -164,6 +165,7 @@ class SSHManager:
             # Connect
             err = self._connect_client(client, config, host, port, user)
             if err:
+                client.close()
                 return None, err, None
             
             # Save host keys if trusted
@@ -174,20 +176,24 @@ class SSHManager:
                 except Exception as save_err:
                     err_msg = f"Failed to save host keys to {known_hosts_path}: {save_err}"
                     logger.error(err_msg)
+                    client.close()
                     return None, f"Error: Connection successful but {err_msg}", None
 
             return client, None, None
         except paramiko.BadHostKeyException as e:
+            client.close()
             # Capture the new fingerprint even on mismatch for display
             new_fp = "SHA256:" + base64.b64encode(hashlib.sha256(e.key.asbytes()).digest()).decode('utf-8').replace('=', '')
             return None, "Host key mismatch", new_fp
         except paramiko.SSHException as e:
+            client.close()
             msg = str(e)
             if "Host key verification failed" in msg:
                 # Return the captured fingerprint if available
                 return None, msg, capture_policy.fingerprint
             return None, msg, None
         except Exception as e:
+            client.close()
             return None, str(e), None
 
     def test_server_connection(self, config: Dict, trust_host: bool = False) -> Tuple[bool, str, Optional[str]]:
@@ -204,54 +210,13 @@ class SSHManager:
     def execute_command(self, alias: str, command: str) -> str:
         """Connect to a server by alias and execute a command with sudo and path resolution."""
         config = self.get_server_by_alias(alias)
-        client, err, _ = self._get_ssh_client(config)
-        if err:
-            logger.error(f"SSH Connection Error on '{alias}': {err}")
-            return f"SSH Error: {err}"
-
-        try:
-            # Handle sudo for non-root users if a password is available
-            user = config.get('user', 'root')
-            password = config.get('password')
-            
-            # Synology/DSM Path Fix: use 'env' to set PATH without sh -c expansion risks
-            path_list = "/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
-
-            if user != 'root' and command.startswith('sudo ') and password:
-                # Rebuild command using: sudo -S -E env PATH=$PATH:... command
-                cmd_body = command[5:] # remove 'sudo '
-                command_to_run = f'sudo -S -E env PATH="$PATH:{path_list}" {cmd_body}'
-                stdin, stdout, stderr = client.exec_command(command_to_run, timeout=60)
-                stdin.write(password + '\n')
-                stdin.flush()
-            else:
-                command_to_run = f'env PATH="$PATH:{path_list}" {command}'
-                stdin, stdout, stderr = client.exec_command(command_to_run, timeout=60)
-
-            output = stdout.read().decode('utf-8')
-            error = stderr.read().decode('utf-8')
-
-            # Clean up sudo password prompt from error output
-            if "[sudo] password for" in error or "Password:" in error:
-                lines = error.splitlines()
-                error = "\n".join([l for l in lines if "[sudo] password for" not in l and "Password:" != l.strip()]).strip()
-
-            if error and output:
-                return f"{output}\n[Error Output]\n{error}"
-            elif error:
-                logger.warning(f"Command on '{alias}' produced error output: {error.strip()}")
-                return error
-            
-            return output
-        except Exception as e:
-            err_msg = f"SSH Execution Error on '{alias}': {str(e)}"
-            logger.error(err_msg)
-            return err_msg
-        finally:
-            client.close()
+        return self._execute_command_for_config(config, command, alias)
 
     def _execute_command_on_config(self, config: Dict, command: str) -> str:
         alias = config.get("alias", config.get("host", "unknown"))
+        return self._execute_command_for_config(config, command, alias)
+
+    def _execute_command_for_config(self, config: Dict, command: str, alias: str) -> str:
         client, err, _ = self._get_ssh_client(config)
         if err:
             logger.error(f"SSH Connection Error on '{alias}': {err}")

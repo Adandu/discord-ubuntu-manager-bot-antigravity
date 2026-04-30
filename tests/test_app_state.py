@@ -14,9 +14,9 @@ class TestAppState(unittest.TestCase):
         discord_settings = DiscordSettings(token="supersecrettoken")
         webui_settings = WebUISettings(password="webuisecret")
         feature_settings = FeatureSettings(power_control_password="powersecret")
-        server1 = ServerSettings(alias="server1", host="localhost", password="server1secret")
-        server2 = ServerSettings(alias="server2", host="localhost", key="/path/to/key")
-        server3 = ServerSettings(alias="server3", host="localhost", key="nonexistent_key")
+        server1 = ServerSettings(alias="alpha", host="example-alpha.invalid", password="server1secret")
+        server2 = ServerSettings(alias="beta", host="example-beta.invalid", key="/path/to/key")
+        server3 = ServerSettings(alias="gamma", host="example-gamma.invalid", key="nonexistent_key")
 
         config = AppConfig(
             discord=discord_settings,

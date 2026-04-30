@@ -5,7 +5,7 @@ FROM python:3.12-slim-bookworm AS builder
 WORKDIR /app
 
 # Install system dependencies
-RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-recommends \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     libssl-dev \
     libffi-dev \
@@ -20,7 +20,7 @@ RUN pip install --no-cache-dir --upgrade pip && \
 FROM python:3.12-slim-bookworm
 
 # Install curl for healthcheck
-RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-recommends \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     && rm -rf /var/lib/apt/lists/*
 

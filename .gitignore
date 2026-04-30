@@ -7,6 +7,7 @@ ENV/
 
 # Project management
 TODO.md
+commit_msg.txt
 
 # Python
 __pycache__/

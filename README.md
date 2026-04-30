@@ -58,11 +58,14 @@ The bot now uses a hybrid configuration system. Initial secrets are set via envi
 - `DATA_DIR`: Directory used for `config.json`, `audit.log`, and `known_hosts`. The Docker image defaults to `/app/data`.
 
 **Recommended Security Environment Variables:**
-- `TRUSTED_PROXY_IPS`: Comma-separated IPs allowed to supply forwarded headers. Default is `127.0.0.1`.
+- `TRUSTED_PROXY_IPS`: Comma-separated IPs or CIDR ranges allowed to supply forwarded headers. Default is `127.0.0.1,::1`.
 - `WEBUI_SECURE_COOKIES`: Set to `true` when the WebUI is served over HTTPS via a reverse proxy.
 
 **Optional Runtime Environment Variables:**
 - `OBSERVABILITY_REFRESH_MS`: Refresh interval for the dashboard observability cards in milliseconds. Default is `30000` and values below `5000` are clamped.
+- `OBSERVABILITY_CACHE_TTL_SECONDS`: Short-lived cache for bulk SSH observability and server checks. Default is `15`.
+- `SSH_FANOUT_LIMIT`: Maximum concurrent SSH checks launched by dashboard bulk endpoints. Default is `5`.
+- `MAX_BACKUP_UPLOAD_BYTES`: Maximum WebUI backup restore upload size. Default is `1048576`.
 
 **WebUI Access:**
 Once the container is running, navigate to `http://<your-ip>:8000` to configure your bot token and servers.
@@ -116,6 +119,14 @@ The repository now includes:
 - `python -m py_compile` smoke validation
 - unit tests for auth hashing, config migration, WebUI flows, and Discord permission behavior
 - GitHub Actions for both validation and Docker image publishing
+
+For local testing:
+
+```bash
+python -m venv .venv
+.venv/bin/pip install -r requirements-dev.txt
+.venv/bin/python -m pytest -q
+```
 
 ---
 

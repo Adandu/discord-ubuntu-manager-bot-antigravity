@@ -15,6 +15,7 @@ known_hosts
 
 # Development Files
 TODO.md
+commit_msg.txt
 README.md
 .env.example
 upload_body.json

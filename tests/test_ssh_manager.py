@@ -41,16 +41,16 @@ from ssh_manager import SSHManager
 class TestSSHManager(unittest.TestCase):
     def setUp(self):
         self.servers = [
-            {"alias": "server1", "ip": "1.1.1.1"},
-            {"alias": "server2", "ip": "2.2.2.2"},
-            {"alias": "web-prod", "ip": "3.3.3.3"},
+            {"alias": "alpha", "host": "192.0.2.1"},
+            {"alias": "beta", "host": "192.0.2.2"},
+            {"alias": "gamma", "host": "192.0.2.3"},
         ]
         self.manager = SSHManager(self.servers)
 
     def test_get_server_aliases_returns_all_aliases(self):
         """Test that get_server_aliases returns a list of all defined aliases."""
         aliases = self.manager.get_server_aliases()
-        self.assertEqual(aliases, ["server1", "server2", "web-prod"])
+        self.assertEqual(aliases, ["alpha", "beta", "gamma"])
 
     def test_get_server_aliases_empty(self):
         """Test that get_server_aliases returns an empty list when initialized with no servers."""
@@ -60,8 +60,8 @@ class TestSSHManager(unittest.TestCase):
     def test_get_server_aliases_none_values(self):
         """Test that get_server_aliases handles alias values that might be None."""
         servers = [
-            {"alias": None, "ip": "1.1.1.1"},
-            {"alias": "valid_alias", "ip": "2.2.2.2"}
+            {"alias": None, "host": "192.0.2.1"},
+            {"alias": "valid_alias", "host": "192.0.2.2"}
         ]
         manager = SSHManager(servers)
         aliases = manager.get_server_aliases()
@@ -88,7 +88,7 @@ class TestSSHManager(unittest.TestCase):
 
         self.manager._connect_client = MagicMock(side_effect=exception)
 
-        client, msg, fingerprint = self.manager._get_ssh_client({"host": "1.2.3.4"})
+        client, msg, fingerprint = self.manager._get_ssh_client({"host": "192.0.2.10"})
 
         self.assertIsNone(client)
         self.assertEqual(msg, "Host key mismatch")
@@ -106,13 +106,13 @@ class TestSSHManager(unittest.TestCase):
         mock_policy.fingerprint = "test_fingerprint"
         self.manager._configure_host_keys = MagicMock(return_value=(True, "path", mock_policy))
 
-        exception = SSHExceptionCls("Host key verification failed for 1.2.3.4")
+        exception = SSHExceptionCls("Host key verification failed for 192.0.2.10")
         self.manager._connect_client = MagicMock(side_effect=exception)
 
-        client, msg, fingerprint = self.manager._get_ssh_client({"host": "1.2.3.4"})
+        client, msg, fingerprint = self.manager._get_ssh_client({"host": "192.0.2.10"})
 
         self.assertIsNone(client)
-        self.assertEqual(msg, "Host key verification failed for 1.2.3.4")
+        self.assertEqual(msg, "Host key verification failed for 192.0.2.10")
         self.assertEqual(fingerprint, "test_fingerprint")
 
     @patch('ssh_manager.paramiko.SSHClient')
@@ -126,7 +126,7 @@ class TestSSHManager(unittest.TestCase):
         exception = SSHExceptionCls("Connection timed out")
         self.manager._connect_client = MagicMock(side_effect=exception)
 
-        client, msg, fingerprint = self.manager._get_ssh_client({"host": "1.2.3.4"})
+        client, msg, fingerprint = self.manager._get_ssh_client({"host": "192.0.2.10"})
 
         self.assertIsNone(client)
         self.assertEqual(msg, "Connection timed out")

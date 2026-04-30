@@ -127,6 +127,43 @@ class WebAppTests(unittest.TestCase):
             patcher.stop()
             temp_dir.cleanup()
 
+    def test_backup_restore_rejects_invalid_and_oversized_uploads(self):
+        temp_dir, patcher, client, _state = self._build_client()
+        try:
+            login_page = client.get("/login")
+            csrf_token = login_page.text.split('name="csrf_token" value="', 1)[1].split(
+                '"', 1
+            )[0]
+            client.post(
+                "/login",
+                data={"password": "admin-pass", "csrf_token": csrf_token},
+                follow_redirects=False,
+            )
+            home = client.get("/")
+            authed_csrf = home.text.split('meta name="csrf-token" content="', 1)[
+                1
+            ].split('"', 1)[0]
+
+            invalid = client.post(
+                "/api/backup/restore",
+                headers={"X-CSRF-Token": authed_csrf},
+                files={"backup_file": ("backup.json", b"{not-json", "application/json")},
+            )
+            self.assertEqual(invalid.status_code, 400)
+            self.assertEqual(invalid.json()["detail"], "Invalid backup file.")
+
+            client.app.state.max_backup_upload_bytes = 8
+            oversized = client.post(
+                "/api/backup/restore",
+                headers={"X-CSRF-Token": authed_csrf},
+                files={"backup_file": ("backup.json", b"0123456789", "application/json")},
+            )
+            self.assertEqual(oversized.status_code, 413)
+        finally:
+            client.close()
+            patcher.stop()
+            temp_dir.cleanup()
+
 
     def test_save_config_ui_authentication(self):
         temp_dir, patcher, client, _state = self._build_client()
@@ -159,7 +196,7 @@ class WebAppTests(unittest.TestCase):
             _state.config.features.power_control_password = "original_power_password"
 
             from models import ServerSettings
-            _state.config.servers = [ServerSettings(alias="test_server", ip="127.0.0.1", user="test", password="original_server_password", key="original_server_key")]
+            _state.config.servers = [ServerSettings(alias="example_server", host="192.0.2.50", user="test", password="original_server_password", key="original_server_key")]
             _state.save_config(_state.config)
             original_webui_hash = _state.config.webui.password
             original_power_hash = _state.config.features.power_control_password
@@ -200,7 +237,7 @@ class WebAppTests(unittest.TestCase):
             _state.config.features.power_control_password = "original_power_password"
 
             from models import ServerSettings
-            _state.config.servers = [ServerSettings(alias="test_server", ip="127.0.0.1", user="test", password="original_server_password", key="original_server_key")]
+            _state.config.servers = [ServerSettings(alias="example_server", host="192.0.2.50", user="test", password="original_server_password", key="original_server_key")]
             _state.save_config(_state.config)
             original_webui_hash = _state.config.webui.password
             original_power_hash = _state.config.features.power_control_password
@@ -253,7 +290,7 @@ class WebAppTests(unittest.TestCase):
             _state.config.features.power_control_password = "original_power_password"
 
             from models import ServerSettings
-            _state.config.servers = [ServerSettings(alias="test_server", ip="127.0.0.1", user="test", password="original_server_password", key="original_server_key")]
+            _state.config.servers = [ServerSettings(alias="example_server", host="192.0.2.50", user="test", password="original_server_password", key="original_server_key")]
             _state.save_config(_state.config)
             original_webui_hash = _state.config.webui.password
             original_power_hash = _state.config.features.power_control_password
@@ -287,7 +324,7 @@ class WebAppTests(unittest.TestCase):
         temp_dir, patcher, client, _state = self._build_client()
         try:
             from models import ServerSettings
-            _state.config.servers = [ServerSettings(alias="test_server", ip="127.0.0.1", user="test", password="original_server_password", key="original_server_key")]
+            _state.config.servers = [ServerSettings(alias="example_server", host="192.0.2.50", user="test", password="original_server_password", key="original_server_key")]
             _state.save_config(_state.config)
             original_webui_hash = _state.config.webui.password
             original_power_hash = _state.config.features.power_control_password
@@ -309,15 +346,15 @@ class WebAppTests(unittest.TestCase):
             _state.config.features.power_control_password = "original_power_password"
 
             from models import ServerSettings
-            _state.config.servers = [ServerSettings(alias="test_server", ip="127.0.0.1", user="test", password="original_server_password", key="original_server_key")]
+            _state.config.servers = [ServerSettings(alias="example_server", host="192.0.2.50", user="test", password="original_server_password", key="original_server_key")]
             _state.save_config(_state.config)
             original_webui_hash = _state.config.webui.password
             original_power_hash = _state.config.features.power_control_password
 
 
             payload = _state.config.model_dump()
-            payload["servers"][0]["alias"] = "new_test_server"
-            payload["servers"][0]["_original_alias"] = "test_server"
+            payload["servers"][0]["alias"] = "new_example_server"
+            payload["servers"][0]["_original_alias"] = "example_server"
             payload["servers"][0]["password"] = "********"
             payload["servers"][0]["key"] = "********"
 
@@ -330,7 +367,7 @@ class WebAppTests(unittest.TestCase):
             self.assertEqual(response.json()["status"], "success")
 
             # Verify secrets are preserved and server renamed
-            self.assertEqual(_state.config.servers[0].alias, "new_test_server")
+            self.assertEqual(_state.config.servers[0].alias, "new_example_server")
             self.assertEqual(_state.config.servers[0].password, "original_server_password")
             self.assertEqual(_state.config.servers[0].key, "original_server_key")
 
@@ -415,12 +452,12 @@ class WebAppTests(unittest.TestCase):
 
 
 
-    def test_test_server_unauthenticated(self):
+    def test_example_server_unauthenticated(self):
         temp_dir, patcher, client, _state = self._build_client()
         try:
             response = client.post(
                 "/api/test-server",
-                json={"alias": "test_server", "host": "localhost", "user": "root", "port": 22, "auth_method": "password", "password": "pass"}
+                json={"alias": "example_server", "host": "192.0.2.31", "user": "root", "port": 22, "auth_method": "password", "password": "pass"}
             )
             self.assertEqual(response.status_code, 401)
         finally:
@@ -429,7 +466,7 @@ class WebAppTests(unittest.TestCase):
             temp_dir.cleanup()
 
     @patch("ssh_manager.SSHManager.test_server_connection")
-    def test_test_server_authenticated_success(self, mock_test_conn):
+    def test_example_server_authenticated_success(self, mock_test_conn):
         temp_dir, patcher, client, state = self._build_client()
         try:
             # Login first
@@ -446,8 +483,8 @@ class WebAppTests(unittest.TestCase):
             mock_test_conn.return_value = (True, "Connection successful", "fingerprint123")
 
             payload = {
-                "alias": "new_server",
-                "host": "127.0.0.1",
+                "alias": "example_new_server",
+                "host": "192.0.2.30",
                 "user": "admin",
                 "port": 2222,
                 "auth_method": "password",
@@ -469,8 +506,8 @@ class WebAppTests(unittest.TestCase):
 
             mock_test_conn.assert_called_once()
             call_args = mock_test_conn.call_args[0]
-            self.assertEqual(call_args[0]["alias"], "new_server")
-            self.assertEqual(call_args[0]["host"], "127.0.0.1")
+            self.assertEqual(call_args[0]["alias"], "example_new_server")
+            self.assertEqual(call_args[0]["host"], "192.0.2.30")
             self.assertEqual(call_args[0]["user"], "admin")
             self.assertEqual(call_args[0]["port"], 2222)
             self.assertEqual(call_args[0]["auth_method"], "password")
@@ -483,23 +520,23 @@ class WebAppTests(unittest.TestCase):
             temp_dir.cleanup()
 
     @patch("ssh_manager.SSHManager.test_server_connection")
-    def test_test_server_obfuscated_credentials(self, mock_test_conn):
+    def test_example_server_obfuscated_credentials(self, mock_test_conn):
         temp_dir, patcher, client, state = self._build_client()
         try:
             # Add an existing server to config
             from models import AppConfig, ServerSettings
             config = AppConfig.model_validate(state.config.model_dump())
             config.servers.append(ServerSettings(
-                alias="existing_server",
-                host="10.0.0.1",
+                alias="example_existing_server",
+                host="192.0.2.21",
                 user="root",
                 port=22,
                 auth_method="password",
                 password="real_password"
             ))
             config.servers.append(ServerSettings(
-                alias="existing_key_server",
-                host="10.0.0.2",
+                alias="example_key_server",
+                host="192.0.2.22",
                 user="root",
                 port=22,
                 auth_method="key",
@@ -522,8 +559,8 @@ class WebAppTests(unittest.TestCase):
 
             # Test password obfuscation
             payload_pwd = {
-                "alias": "existing_server",
-                "host": "10.0.0.1",
+                "alias": "example_existing_server",
+                "host": "192.0.2.21",
                 "user": "root",
                 "port": 22,
                 "auth_method": "password",
@@ -541,14 +578,14 @@ class WebAppTests(unittest.TestCase):
             mock_test_conn.assert_called_once()
             call_args_pwd = mock_test_conn.call_args[0]
             self.assertEqual(call_args_pwd[0]["password"], "real_password")
-            self.assertEqual(call_args_pwd[0]["host"], "10.0.0.1")
+            self.assertEqual(call_args_pwd[0]["host"], "192.0.2.21")
 
             mock_test_conn.reset_mock()
 
             # Test key obfuscation
             payload_key = {
-                "alias": "existing_key_server",
-                "host": "10.0.0.2",
+                "alias": "example_key_server",
+                "host": "192.0.2.22",
                 "user": "root",
                 "port": 22,
                 "auth_method": "key",
@@ -573,7 +610,7 @@ class WebAppTests(unittest.TestCase):
             temp_dir.cleanup()
 
     @patch("ssh_manager.SSHManager.test_server_connection")
-    def test_test_server_rate_limit(self, mock_test_conn):
+    def test_example_server_rate_limit(self, mock_test_conn):
         temp_dir, patcher, client, state = self._build_client()
         try:
             # Login
@@ -591,7 +628,7 @@ class WebAppTests(unittest.TestCase):
 
             payload = {
                 "alias": "test_limit",
-                "host": "localhost",
+                "host": "192.0.2.31",
                 "user": "root",
                 "port": 22,
                 "auth_method": "password",
@@ -626,30 +663,46 @@ class WebAppTests(unittest.TestCase):
             temp_dir.cleanup()
 
 class TestGetClientIp(unittest.TestCase):
-    def test_x_forwarded_for(self):
-        from fastapi import Request
-        from web_app import get_client_ip
+    def _request(self, headers=None, client=("127.0.0.1", 8080), trusted_proxies="127.0.0.1"):
+        from fastapi import FastAPI, Request
+        from web_app import _parse_ip_networks
+
+        app = FastAPI()
+        app.state.trusted_proxy_networks = _parse_ip_networks(trusted_proxies)
         scope = {
             "type": "http",
-            "headers": [
-                (b"x-forwarded-for", b"192.168.1.1, 10.0.0.1"),
-                (b"x-real-ip", b"10.0.0.1"),
-            ]
+            "headers": headers or [],
+            "client": client,
+            "app": app,
         }
-        request = Request(scope)
-        self.assertEqual(get_client_ip(request), "192.168.1.1")
+        return Request(scope)
+
+    def test_x_forwarded_for(self):
+        from web_app import get_client_ip
+        request = self._request(
+            headers=[
+                (b"x-forwarded-for", b"198.51.100.10, 192.0.2.21"),
+                (b"x-real-ip", b"192.0.2.21"),
+            ],
+        )
+        self.assertEqual(get_client_ip(request), "198.51.100.10")
 
     def test_x_real_ip(self):
-        from fastapi import Request
         from web_app import get_client_ip
-        scope = {
-            "type": "http",
-            "headers": [
-                (b"x-real-ip", b"10.0.0.1"),
-            ]
-        }
-        request = Request(scope)
-        self.assertEqual(get_client_ip(request), "10.0.0.1")
+        request = self._request(
+            headers=[
+                (b"x-real-ip", b"192.0.2.21"),
+            ],
+        )
+        self.assertEqual(get_client_ip(request), "192.0.2.21")
+
+    def test_untrusted_proxy_headers_are_ignored(self):
+        from web_app import get_client_ip
+        request = self._request(
+            headers=[(b"x-forwarded-for", b"198.51.100.10")],
+            client=("203.0.113.9", 8080),
+        )
+        self.assertEqual(get_client_ip(request), "203.0.113.9")
 
     def test_client_host_fallback(self):
         from fastapi import Request
@@ -657,10 +710,10 @@ class TestGetClientIp(unittest.TestCase):
         scope = {
             "type": "http",
             "headers": [],
-            "client": ("172.16.0.1", 8080)
+            "client": ("198.51.100.20", 8080)
         }
         request = Request(scope)
-        self.assertEqual(get_client_ip(request), "172.16.0.1")
+        self.assertEqual(get_client_ip(request), "198.51.100.20")
 
     def test_missing_client(self):
         from fastapi import Request

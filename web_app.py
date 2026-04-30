@@ -2,8 +2,11 @@ from __future__ import annotations
 
 import asyncio
 import hmac
+import ipaddress
+import json
 import os
 import secrets
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -11,6 +14,7 @@ from fastapi import APIRouter, FastAPI, File, Form, HTTPException, Request, Uplo
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from pydantic import ValidationError
 from starlette.middleware.sessions import SessionMiddleware
 
 from app_state import AppState
@@ -24,16 +28,108 @@ from models import (
 )
 
 router = APIRouter()
+DEFAULT_TRUSTED_PROXY_IPS = "127.0.0.1,::1"
+DEFAULT_MAX_BACKUP_UPLOAD_BYTES = 1024 * 1024
 
 
 def get_client_ip(request: Request) -> str:
+    peer_ip = request.client.host if request.client else "unknown"
+    if not _is_trusted_proxy(peer_ip, _trusted_proxy_networks_from_request(request)):
+        return peer_ip
+
     forwarded = request.headers.get("X-Forwarded-For")
     if forwarded:
         return forwarded.split(",")[0].strip()
     real_ip = request.headers.get("X-Real-IP")
     if real_ip:
         return real_ip.strip()
-    return request.client.host if request.client else "unknown"
+    return peer_ip
+
+
+def _trusted_proxy_networks_from_request(request: Request) -> list[ipaddress._BaseNetwork]:
+    try:
+        return request.app.state.trusted_proxy_networks
+    except Exception:
+        return _parse_ip_networks(os.getenv("TRUSTED_PROXY_IPS", DEFAULT_TRUSTED_PROXY_IPS))
+
+
+def _parse_ip_networks(raw_value: str) -> list[ipaddress._BaseNetwork]:
+    networks = []
+    for item in raw_value.split(","):
+        item = item.strip()
+        if not item:
+            continue
+        try:
+            networks.append(ipaddress.ip_network(item, strict=False))
+        except ValueError:
+            continue
+    return networks
+
+
+def _is_trusted_proxy(peer_ip: str, networks: list[ipaddress._BaseNetwork]) -> bool:
+    try:
+        address = ipaddress.ip_address(peer_ip)
+    except ValueError:
+        return False
+    return any(address in network for network in networks)
+
+
+def require_api_rate_limit(request: Request, detail: str) -> None:
+    state: AppState = request.app.state.app_state
+    if not state.api_limiter.is_allowed(get_client_ip(request)):
+        raise HTTPException(status_code=429, detail=detail)
+
+
+def _server_config_signature(state: AppState) -> tuple:
+    return (
+        state.config.features.enable_docker,
+        tuple(
+            (server.alias, server.host, server.port, server.backup_path)
+            for server in state.config.servers
+        ),
+    )
+
+
+async def _run_cached_server_fanout(
+    state: AppState,
+    cache_name: str,
+    lock_name: str,
+    worker,
+) -> list[dict[str, str]]:
+    now = time.time()
+    signature = _server_config_signature(state)
+    cache = getattr(state, cache_name)
+    cached = cache.get("value")
+    if (
+        cached
+        and cached["signature"] == signature
+        and now - cached["timestamp"] < state.observability_cache_ttl
+    ):
+        return cached["results"]
+
+    async with getattr(state, lock_name):
+        now = time.time()
+        cached = cache.get("value")
+        if (
+            cached
+            and cached["signature"] == signature
+            and now - cached["timestamp"] < state.observability_cache_ttl
+        ):
+            return cached["results"]
+
+        semaphore = asyncio.Semaphore(max(1, state.ssh_fanout_limit))
+
+        async def run_one(server):
+            async with semaphore:
+                return await worker(server)
+
+        results = await asyncio.gather(*(run_one(server) for server in state.config.servers))
+        cache["value"] = {
+            "signature": signature,
+            "timestamp": time.time(),
+            "results": results,
+        }
+        return results
 
 
 def is_authenticated(request: Request) -> bool:
@@ -214,13 +310,8 @@ async def test_server(request: Request, server_data: TestServerRequest):
         raise HTTPException(status_code=401)
     validate_csrf(request)
 
-    client_ip = get_client_ip(request)
     state: AppState = request.app.state.app_state
-    if not state.api_limiter.is_allowed(client_ip):
-        raise HTTPException(
-            status_code=429,
-            detail="Too many requests. Please wait before testing again.",
-        )
+    require_api_rate_limit(request, "Too many requests. Please wait before testing again.")
 
     server_payload = server_data.model_dump(by_alias=True)
     original = next(
@@ -253,13 +344,8 @@ async def save_config_ui(request: Request, payload: SaveConfigRequest):
         raise HTTPException(status_code=401)
     validate_csrf(request)
 
-    client_ip = get_client_ip(request)
     state: AppState = request.app.state.app_state
-    if not state.api_limiter.is_allowed(client_ip):
-        raise HTTPException(
-            status_code=429,
-            detail="Too many requests. Please wait before saving again.",
-        )
+    require_api_rate_limit(request, "Too many requests. Please wait before saving again.")
 
     body = payload.model_dump(by_alias=True)
     if "SECRET_KEY" in body:
@@ -317,12 +403,8 @@ async def export_backup(request: Request):
         raise HTTPException(status_code=401)
     validate_csrf(request)
 
-    client_ip = get_client_ip(request)
     state: AppState = request.app.state.app_state
-    if not state.api_limiter.is_allowed(client_ip):
-        raise HTTPException(
-            status_code=429, detail="Too many requests. Please try again later."
-        )
+    require_api_rate_limit(request, "Too many requests. Please try again later.")
 
     raw = state.config_manager.export_raw_config()
     filename = (
@@ -340,10 +422,21 @@ async def restore_backup(request: Request, backup_file: UploadFile = File(...)):
     if not is_authenticated(request):
         raise HTTPException(status_code=401)
     validate_csrf(request)
+    require_api_rate_limit(request, "Too many requests. Please try again later.")
     state: AppState = request.app.state.app_state
-    raw = await backup_file.read()
-    restored = state.config_manager.import_raw_config(raw)
+    max_bytes = request.app.state.max_backup_upload_bytes
+    raw = await backup_file.read(max_bytes + 1)
+    if len(raw) > max_bytes:
+        raise HTTPException(
+            status_code=413,
+            detail=f"Backup file exceeds the {max_bytes} byte upload limit.",
+        )
+    try:
+        restored = state.config_manager.import_raw_config(raw)
+    except (json.JSONDecodeError, UnicodeDecodeError, ValidationError, ValueError) as exc:
+        raise HTTPException(status_code=400, detail="Invalid backup file.") from exc
     state.refresh_runtime()
+    state.audit_log(0, "webui", "backup_restore", f"Restored {len(restored.servers)} servers")
     return RestoreConfigResponse(
         status="success", restored_servers=len(restored.servers)
     )
@@ -353,6 +446,7 @@ async def restore_backup(request: Request, backup_file: UploadFile = File(...)):
 async def bulk_server_check(request: Request):
     if not is_authenticated(request):
         raise HTTPException(status_code=401)
+    require_api_rate_limit(request, "Too many requests. Please try again later.")
 
     state: AppState = request.app.state.app_state
 
@@ -364,8 +458,11 @@ async def bulk_server_check(request: Request):
             state.config.features.enable_docker,
         )
 
-    results = await asyncio.gather(
-        *(check_one(server) for server in state.config.servers)
+    results = await _run_cached_server_fanout(
+        state,
+        "_server_check_cache",
+        "_server_check_lock",
+        check_one,
     )
     return {"results": results}
 
@@ -374,6 +471,7 @@ async def bulk_server_check(request: Request):
 async def server_overview(request: Request):
     if not is_authenticated(request):
         raise HTTPException(status_code=401)
+    require_api_rate_limit(request, "Too many requests. Please try again later.")
 
     state: AppState = request.app.state.app_state
 
@@ -385,8 +483,11 @@ async def server_overview(request: Request):
             state.config.features.enable_docker,
         )
 
-    results = await asyncio.gather(
-        *(overview_one(server) for server in state.config.servers)
+    results = await _run_cached_server_fanout(
+        state,
+        "_server_overview_cache",
+        "_server_overview_lock",
+        overview_one,
     )
     return {"results": results}
 
@@ -406,8 +507,18 @@ async def health(request: Request):
 def create_web_app(state: AppState) -> FastAPI:
     app = FastAPI(title="DiscoBunty Dashboard")
     secret_key = os.getenv("SECRET_KEY")
+    trusted_proxy_networks = _parse_ip_networks(
+        os.getenv("TRUSTED_PROXY_IPS", DEFAULT_TRUSTED_PROXY_IPS)
+    )
     observability_refresh_ms = max(
         5000, int(os.getenv("OBSERVABILITY_REFRESH_MS", "30000"))
+    )
+    observability_cache_ttl = max(
+        0, int(os.getenv("OBSERVABILITY_CACHE_TTL_SECONDS", "15"))
+    )
+    ssh_fanout_limit = max(1, int(os.getenv("SSH_FANOUT_LIMIT", "5")))
+    max_backup_upload_bytes = max(
+        1024, int(os.getenv("MAX_BACKUP_UPLOAD_BYTES", str(DEFAULT_MAX_BACKUP_UPLOAD_BYTES)))
     )
     if not secret_key:
         raise ValueError(
@@ -432,6 +543,10 @@ def create_web_app(state: AppState) -> FastAPI:
     app.state.app_state = state
     app.state.templates = templates
     app.state.observability_refresh_ms = observability_refresh_ms
+    app.state.trusted_proxy_networks = trusted_proxy_networks
+    app.state.max_backup_upload_bytes = max_backup_upload_bytes
+    state.observability_cache_ttl = observability_cache_ttl
+    state.ssh_fanout_limit = ssh_fanout_limit
 
     app.include_router(router)
 

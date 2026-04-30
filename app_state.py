@@ -68,6 +68,12 @@ class AppState:
     log_buffer: deque[str] = field(default_factory=lambda: deque(maxlen=500))
     login_limiter: LoginRateLimiter = field(default_factory=lambda: LoginRateLimiter(max_attempts=5, window_seconds=60))
     api_limiter: LoginRateLimiter = field(default_factory=lambda: LoginRateLimiter(max_attempts=30, window_seconds=60))
+    ssh_fanout_limit: int = 5
+    observability_cache_ttl: int = 15
+    _server_check_cache: dict = field(default_factory=dict)
+    _server_overview_cache: dict = field(default_factory=dict)
+    _server_check_lock: asyncio.Lock = field(default_factory=asyncio.Lock)
+    _server_overview_lock: asyncio.Lock = field(default_factory=asyncio.Lock)
 
     def __post_init__(self) -> None:
         self.log_buffer.append("System Initialized. Log capture started.")
@@ -77,6 +83,11 @@ class AppState:
         self.config: AppConfig = self.config_manager.config
         self.ssh_manager = SSHManager([server.model_dump(by_alias=True) for server in self.config.servers])
         self.servers_by_alias = {server.alias: server for server in self.config.servers}
+        self.clear_observability_cache()
+
+    def clear_observability_cache(self) -> None:
+        self._server_check_cache.clear()
+        self._server_overview_cache.clear()
 
     @property
     def audit_log_path(self) -> Path:

@@ -60,7 +60,7 @@ class ConfigManagerTests(unittest.TestCase):
                         "discord": {"token": "", "guild_id": "", "allowed_roles": "Admin"},
                         "features": {"enable_docker": True, "power_control_enabled": False, "power_control_password": ""},
                         "webui": {"enabled": True, "password": "legacy-password"},
-                        "servers": [{"alias": "srv1", "host": "1.2.3.4", "user": "root", "port": 22, "auth_method": "key", "password": "", "key": ""}],
+                        "servers": [{"alias": "srv1", "host": "192.0.2.10", "user": "root", "port": 22, "auth_method": "key", "password": "", "key": ""}],
                     }
                 ),
                 encoding="utf-8",
