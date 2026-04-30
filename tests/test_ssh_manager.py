@@ -1,32 +1,42 @@
+
 import unittest
 import sys
 from unittest.mock import MagicMock, patch
 
-# Mock paramiko module to handle environments where it's not installed
-paramiko_mock = MagicMock()
-paramiko_mock.SSHClient = MagicMock
-paramiko_mock.AutoAddPolicy = MagicMock
-paramiko_mock.MissingHostKeyPolicy = MagicMock
-paramiko_mock.RSAKey = MagicMock
-paramiko_mock.Ed25519Key = MagicMock
-paramiko_mock.ECDSAKey = MagicMock
-paramiko_mock.DSSKey = MagicMock
+try:
+    import paramiko
+    PARAMIKO_INSTALLED = True
+    SSHExceptionCls = paramiko.SSHException
+    BadHostKeyExceptionCls = paramiko.BadHostKeyException
+except ImportError:
+    PARAMIKO_INSTALLED = False
 
-# Base Exception classes for tests
-class SSHExceptionMock(Exception):
-    pass
-class BadHostKeyExceptionMock(Exception):
-    def __init__(self, hostname, key, expected_key):
-        self.hostname = hostname
-        self.key = key
-        self.expected_key = expected_key
+    paramiko_mock = MagicMock()
+    paramiko_mock.SSHClient = MagicMock
+    paramiko_mock.AutoAddPolicy = MagicMock
+    paramiko_mock.MissingHostKeyPolicy = MagicMock
+    paramiko_mock.RSAKey = MagicMock
+    paramiko_mock.Ed25519Key = MagicMock
+    paramiko_mock.ECDSAKey = MagicMock
+    paramiko_mock.DSSKey = MagicMock
 
-paramiko_mock.SSHException = SSHExceptionMock
-paramiko_mock.BadHostKeyException = BadHostKeyExceptionMock
+    class SSHExceptionMock(Exception): pass
+    class BadHostKeyExceptionMock(Exception):
+        def __init__(self, hostname, key, expected_key):
+            self.hostname = hostname
+            self.key = key
+            self.expected_key = expected_key
 
-sys.modules['paramiko'] = paramiko_mock
+    paramiko_mock.SSHException = SSHExceptionMock
+    paramiko_mock.BadHostKeyException = BadHostKeyExceptionMock
+
+    SSHExceptionCls = SSHExceptionMock
+    BadHostKeyExceptionCls = BadHostKeyExceptionMock
+
+    sys.modules['paramiko'] = paramiko_mock
 
 from ssh_manager import SSHManager
+
 
 class TestSSHManager(unittest.TestCase):
     def setUp(self):
@@ -74,7 +84,7 @@ class TestSSHManager(unittest.TestCase):
 
         mock_key = MagicMock()
         mock_key.asbytes.return_value = b"fake_key_bytes"
-        exception = BadHostKeyExceptionMock("hostname", mock_key, "expected_key")
+        exception = BadHostKeyExceptionCls("hostname", mock_key, "expected_key")
 
         self.manager._connect_client = MagicMock(side_effect=exception)
 
@@ -96,7 +106,7 @@ class TestSSHManager(unittest.TestCase):
         mock_policy.fingerprint = "test_fingerprint"
         self.manager._configure_host_keys = MagicMock(return_value=(True, "path", mock_policy))
 
-        exception = SSHExceptionMock("Host key verification failed for 1.2.3.4")
+        exception = SSHExceptionCls("Host key verification failed for 1.2.3.4")
         self.manager._connect_client = MagicMock(side_effect=exception)
 
         client, msg, fingerprint = self.manager._get_ssh_client({"host": "1.2.3.4"})
@@ -113,7 +123,7 @@ class TestSSHManager(unittest.TestCase):
 
         self.manager._configure_host_keys = MagicMock(return_value=(True, "path", MagicMock()))
 
-        exception = SSHExceptionMock("Connection timed out")
+        exception = SSHExceptionCls("Connection timed out")
         self.manager._connect_client = MagicMock(side_effect=exception)
 
         client, msg, fingerprint = self.manager._get_ssh_client({"host": "1.2.3.4"})
