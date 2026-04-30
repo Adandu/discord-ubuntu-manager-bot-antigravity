@@ -355,6 +355,41 @@ class SSHManager:
         metrics["last_backup_age"] = _humanize_age_seconds(metrics["last_backup_age"])
         return metrics
 
+    def _build_capabilities_command(self, backup_path: str, include_docker: bool) -> str:
+        # Batch checks into a single command to avoid N+1 SSH connections
+        command = "echo '---RESULTS---';"
+
+        # Check sudo
+        command += " if sudo -n true 2>&1 | grep -q -e 'not allowed' -e 'password is required'; then echo 'sudo_status=fail'; else echo 'sudo_status=ok'; fi;"
+
+        # Check docker
+        if include_docker:
+            command += " if command -v docker >/dev/null 2>&1 && sudo docker ps -q >/dev/null 2>&1; then echo 'docker_status=ok'; else echo 'docker_status=fail'; fi;"
+
+        # Check backup path
+        if backup_path:
+            safe_path = shlex.quote(backup_path)
+            command += f" if test -e {safe_path}; then echo 'backup_status=ok'; else echo 'backup_status=missing'; fi;"
+
+        return command
+
+    def _parse_capabilities_output(self, output: str, status: Dict[str, str]) -> None:
+        lines = output.split('\n')
+        for line in lines:
+            if 'sudo_status=ok' in line:
+                status["sudo"] = "ok"
+            elif 'sudo_status=fail' in line:
+                status["sudo"] = "fail"
+                status["message"] = "Sudo failed or requires password"
+            elif 'docker_status=ok' in line:
+                status["docker"] = "ok"
+            elif 'docker_status=fail' in line:
+                status["docker"] = "fail"
+            elif 'backup_status=ok' in line:
+                status["backup"] = "ok"
+            elif 'backup_status=missing' in line:
+                status["backup"] = "missing"
+
     def check_server_capabilities(self, alias: str, backup_path: str = "", include_docker: bool = False) -> Dict[str, str]:
         status = {
             "alias": alias,
@@ -377,42 +412,14 @@ class SSHManager:
             return status
         status["ssh"] = "ok"
 
-        # Batch checks into a single command to avoid N+1 SSH connections
-        command = "echo '---RESULTS---';"
-
-        # Check sudo
-        command += " if sudo -n true 2>&1 | grep -q -e 'not allowed' -e 'password is required'; then echo 'sudo_status=fail'; else echo 'sudo_status=ok'; fi;"
-
-        # Check docker
-        if include_docker:
-            command += " if command -v docker >/dev/null 2>&1 && sudo docker ps -q >/dev/null 2>&1; then echo 'docker_status=ok'; else echo 'docker_status=fail'; fi;"
-
-        # Check backup path
-        if backup_path:
-            safe_path = shlex.quote(backup_path)
-            command += f" if test -e {safe_path}; then echo 'backup_status=ok'; else echo 'backup_status=missing'; fi;"
-
+        command = self._build_capabilities_command(backup_path, include_docker)
         output = self.execute_command(alias, command)
 
         if "SSH Error" in output:
             status["message"] = output
             return status
 
-        lines = output.split('\n')
-        for line in lines:
-            if 'sudo_status=ok' in line:
-                status["sudo"] = "ok"
-            elif 'sudo_status=fail' in line:
-                status["sudo"] = "fail"
-                status["message"] = "Sudo failed or requires password"
-            elif 'docker_status=ok' in line:
-                status["docker"] = "ok"
-            elif 'docker_status=fail' in line:
-                status["docker"] = "fail"
-            elif 'backup_status=ok' in line:
-                status["backup"] = "ok"
-            elif 'backup_status=missing' in line:
-                status["backup"] = "missing"
+        self._parse_capabilities_output(output, status)
 
         return status
 
