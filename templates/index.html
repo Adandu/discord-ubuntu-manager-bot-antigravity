@@ -208,14 +208,11 @@
         a.href = url;
         const disposition = res.headers.get('Content-Disposition');
         let filename = 'discobunty-backup.json';
-        if (disposition && disposition.indexOf('attachment') !== -1) {
-            const filenameRegex = /filename[^;=
-]*=((['"]).*?|[^;
-]*)/;
-            const matches = filenameRegex.exec(disposition);
-            if (matches != null && matches[1]) {
-                filename = matches[1].replace(/['"]/g, '');
-            }
+        if (disposition && disposition.includes('attachment')) {
+          const filenamePart = disposition.split(';').map(part => part.trim()).find(part => part.toLowerCase().startsWith('filename='));
+          if (filenamePart) {
+            filename = filenamePart.slice('filename='.length).replace(/^"|"$/g, '');
+          }
         }
         a.download = filename;
         document.body.appendChild(a);
