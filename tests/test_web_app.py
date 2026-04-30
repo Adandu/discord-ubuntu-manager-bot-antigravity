@@ -110,7 +110,7 @@ class WebAppTests(unittest.TestCase):
                 1
             ].split('"', 1)[0]
 
-            export = client.get("/api/backup/export")
+            export = client.get("/api/backup/export", headers={"X-CSRF-Token": authed_csrf})
             self.assertEqual(export.status_code, 200)
             self.assertIn("attachment;", export.headers["content-disposition"])
 

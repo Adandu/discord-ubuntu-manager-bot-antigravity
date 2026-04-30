@@ -195,7 +195,37 @@
     function badge(label, status) { const colors = { ok:'bg-[#23a55a]/20 text-[#4ade80]', fail:'bg-[#93000a]/30 text-[#ffb4ab]', missing:'bg-[#743500]/30 text-[#ffb689]', error:'bg-[#93000a]/30 text-[#ffb4ab]', 'n/a':'bg-[#33353a] text-[#c6c5d7]' }; return `<span class="rounded-full px-3 py-1 text-xs font-semibold ${colors[status] || colors['n/a']}">${escapeHtml(label)}: ${escapeHtml(status)}</span>`; }
     async function runServerChecks() { const grid = document.getElementById('checksGrid'); grid.innerHTML='<div class="panel p-4 text-sm text-[#c6c5d7]">Running checks…</div>'; try { const res = await fetch('/api/servers/check'); const payload = await res.json(); grid.innerHTML = payload.results.length ? '' : '<div class="panel p-4 text-sm text-[#8f8fa0]">No servers configured.</div>'; payload.results.forEach((item) => { const row = document.createElement('div'); row.className='rounded-[20px] bg-[#0f1217] p-4'; row.innerHTML = `<div class="flex flex-wrap items-center justify-between gap-3"><h3 class="text-sm font-bold">${escapeHtml(item.alias)}</h3><div class="flex flex-wrap gap-2">${badge('SSH', item.ssh)}${badge('Sudo', item.sudo)}${badge('Docker', item.docker)}${badge('Known Host', item.known_host)}${badge('Backup', item.backup)}</div></div>${item.message ? `<p class="mt-3 text-xs text-[#c6c5d7]">${escapeHtml(item.message)}</p>` : ''}`; grid.appendChild(row); }); } catch (error) { grid.innerHTML = `<div class="panel p-4 text-sm text-[#ffb4ab]">Failed to run checks: ${escapeHtml(error.message)}</div>`; } }
     async function refreshOverview() { const grid = document.getElementById('overviewGrid'); const status = document.getElementById('overviewStatus'); status.textContent='Loading…'; try { const res = await fetch('/api/servers/overview'); const payload = await res.json(); grid.innerHTML = payload.results.length ? '' : '<div class="panel p-8 text-center text-[#8f8fa0]">No servers configured.</div>'; payload.results.forEach((item) => { const card = document.createElement('div'); card.className='panel p-5'; card.innerHTML = `<div class="flex items-center justify-between gap-3"><div><h3 class="text-lg font-bold">${escapeHtml(item.alias)}</h3><p class="text-sm ${item.status === 'online' ? 'text-[#4ade80]' : 'text-[#ffb4ab]'}">${escapeHtml(item.status)}</p></div></div><div class="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">${[['CPU',item.cpu],['RAM',item.ram],['Disk',item.disk],['Uptime',item.uptime],['Docker',item.docker_count],['Last Backup Age',item.last_backup_age]].map(([label,val]) => `<div class="rounded-[18px] bg-[#0f1217] p-4"><p class="text-[11px] uppercase tracking-[0.18em] text-[#8f8fa0]">${escapeHtml(label)}</p><p class="mt-2 text-sm font-semibold">${escapeHtml(val)}</p></div>`).join('')}</div>${item.error ? `<p class="mt-3 text-xs text-[#ffb4ab]">${escapeHtml(item.error)}</p>` : ''}`; grid.appendChild(card); }); status.textContent=`Updated ${new Date().toLocaleTimeString()}`; } catch (error) { grid.innerHTML = `<div class="panel p-8 text-center text-[#ffb4ab]">Failed to load observability: ${escapeHtml(error.message)}</div>`; status.textContent='Unavailable'; } }
-    function downloadBackup() { window.location.href = '/api/backup/export'; }
+    async function downloadBackup() {
+      try {
+        const res = await fetch('/api/backup/export', { headers: { 'X-CSRF-Token': csrfToken } });
+        if (!res.ok) {
+          if (res.status === 429) throw new Error('Too many requests. Please try again later.');
+          throw new Error('Backup export failed.');
+        }
+        const blob = await res.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        const disposition = res.headers.get('Content-Disposition');
+        let filename = 'discobunty-backup.json';
+        if (disposition && disposition.indexOf('attachment') !== -1) {
+            const filenameRegex = /filename[^;=
+]*=((['"]).*?|[^;
+]*)/;
+            const matches = filenameRegex.exec(disposition);
+            if (matches != null && matches[1]) {
+                filename = matches[1].replace(/['"]/g, '');
+            }
+        }
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+      } catch (error) {
+        setStatus(`Export failed: ${error.message}`, true);
+      }
+    }
     async function restoreBackup(event) { const file = event.target.files[0]; if (!file) return; const formData = new FormData(); formData.append('backup_file', file); try { const res = await fetch('/api/backup/restore', { method:'POST', headers:{'X-CSRF-Token':csrfToken}, body:formData }); const payload = await res.json(); if (!res.ok) throw new Error(payload.detail || 'Restore failed'); setStatus(`Backup restored. ${payload.restored_servers} servers loaded.`); window.location.reload(); } catch (error) { setStatus(`Restore failed: ${error.message}`, true); } finally { event.target.value = ''; } }
     renderServers(); fetchLogs(); fetchAuditLogs(); refreshOverview(); runServerChecks(); setInterval(fetchLogs, 5000); setInterval(fetchAuditLogs, 10000); setInterval(refreshOverview, observabilityRefreshMs);
   </script>

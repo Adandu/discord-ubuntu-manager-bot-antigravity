@@ -315,7 +315,15 @@ async def get_audit_logs(request: Request):
 async def export_backup(request: Request):
     if not is_authenticated(request):
         raise HTTPException(status_code=401)
+    validate_csrf(request)
+
+    client_ip = get_client_ip(request)
     state: AppState = request.app.state.app_state
+    if not state.api_limiter.is_allowed(client_ip):
+        raise HTTPException(
+            status_code=429, detail="Too many requests. Please try again later."
+        )
+
     raw = state.config_manager.export_raw_config()
     filename = (
         f"discobunty-backup-{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')}.json"
