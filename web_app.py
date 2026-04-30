@@ -308,7 +308,7 @@ async def get_audit_logs(request: Request):
     if not is_authenticated(request):
         raise HTTPException(status_code=401)
     state: AppState = request.app.state.app_state
-    return {"entries": state.read_audit_entries()}
+    return {"entries": await state.read_audit_entries()}
 
 
 @router.get("/api/backup/export")
