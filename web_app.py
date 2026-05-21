@@ -349,11 +349,11 @@ async def save_config_ui(request: Request, payload: SaveConfigRequest):
             state.config.features.power_control_password
         )
 
-    original_by_alias = {server.alias: server for server in state.config.servers}
+
     original_by_index = list(state.config.servers)
     for index, server in enumerate(body["servers"]):
         original_alias = server.get("_original_alias") or server.get("alias")
-        original = original_by_alias.get(original_alias)
+        original = state.servers_by_alias.get(original_alias)
         if not original and index < len(original_by_index):
             original = original_by_index[index]
         if original and server.get("password") == "********":
