@@ -81,13 +81,7 @@ def require_api_rate_limit(request: Request, detail: str) -> None:
 
 
 def _server_config_signature(state: AppState) -> tuple:
-    return (
-        state.config.features.enable_docker,
-        tuple(
-            (server.alias, server.host, server.port, server.backup_path)
-            for server in state.config.servers
-        ),
-    )
+    return state.server_config_signature
 
 
 async def _run_cached_server_fanout(

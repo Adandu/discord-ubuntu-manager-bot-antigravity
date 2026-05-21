@@ -74,6 +74,7 @@ class AppState:
     _server_overview_cache: dict = field(default_factory=dict)
     _server_check_lock: asyncio.Lock = field(default_factory=asyncio.Lock)
     _server_overview_lock: asyncio.Lock = field(default_factory=asyncio.Lock)
+    server_config_signature: tuple = field(default_factory=tuple)
 
     def __post_init__(self) -> None:
         self.log_buffer.append("System Initialized. Log capture started.")
@@ -83,6 +84,13 @@ class AppState:
         self.config: AppConfig = self.config_manager.config
         self.ssh_manager = SSHManager([server.model_dump(by_alias=True) for server in self.config.servers])
         self.servers_by_alias = {server.alias: server for server in self.config.servers}
+        self.server_config_signature = (
+            self.config.features.enable_docker,
+            tuple(
+                (server.alias, server.host, server.port, server.backup_path)
+                for server in self.config.servers
+            ),
+        )
         self.clear_observability_cache()
 
     def clear_observability_cache(self) -> None:
