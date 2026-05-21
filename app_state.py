@@ -1,4 +1,3 @@
-
 import asyncio
 import logging
 import os
@@ -66,8 +65,12 @@ class AppState:
     logger: logging.Logger
     data_dir: Path
     log_buffer: deque[str] = field(default_factory=lambda: deque(maxlen=500))
-    login_limiter: LoginRateLimiter = field(default_factory=lambda: LoginRateLimiter(max_attempts=5, window_seconds=60))
-    api_limiter: LoginRateLimiter = field(default_factory=lambda: LoginRateLimiter(max_attempts=30, window_seconds=60))
+    login_limiter: LoginRateLimiter = field(
+        default_factory=lambda: LoginRateLimiter(max_attempts=5, window_seconds=60)
+    )
+    api_limiter: LoginRateLimiter = field(
+        default_factory=lambda: LoginRateLimiter(max_attempts=30, window_seconds=60)
+    )
     ssh_fanout_limit: int = 5
     observability_cache_ttl: int = 15
     _server_check_cache: dict = field(default_factory=dict)
@@ -81,7 +84,9 @@ class AppState:
 
     def refresh_runtime(self) -> None:
         self.config: AppConfig = self.config_manager.config
-        self.ssh_manager = SSHManager([server.model_dump(by_alias=True) for server in self.config.servers])
+        self.ssh_manager = SSHManager(
+            [server.model_dump(by_alias=True) for server in self.config.servers]
+        )
         self.servers_by_alias = {server.alias: server for server in self.config.servers}
         self.clear_observability_cache()
 
@@ -93,12 +98,25 @@ class AppState:
     def audit_log_path(self) -> Path:
         return self.data_dir / "audit.log"
 
-    def audit_log(self, user_id: int, username: str, command: str, details: str) -> None:
+    def audit_log(
+        self, user_id: int, username: str, command: str, details: str
+    ) -> None:
         timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
-        log_entry = f"[{timestamp}] USER:{user_id} ({username}) | CMD:{command} | {details}\n"
-        self.audit_log_path.parent.mkdir(parents=True, exist_ok=True)
-        with self.audit_log_path.open("a", encoding="utf-8") as handle:
-            handle.write(log_entry)
+        log_entry = (
+            f"[{timestamp}] USER:{user_id} ({username}) | CMD:{command} | {details}\n"
+        )
+
+        def _write():
+            self.audit_log_path.parent.mkdir(parents=True, exist_ok=True)
+            with self.audit_log_path.open("a", encoding="utf-8") as handle:
+                handle.write(log_entry)
+
+        try:
+            loop = asyncio.get_running_loop()
+            loop.create_task(asyncio.to_thread(_write))
+        except RuntimeError:
+            _write()
+
         self.logger.info("AUDIT: %s", log_entry.strip())
 
     def masked_config_dict(self) -> dict:
@@ -127,8 +145,10 @@ class AppState:
     async def read_audit_entries(self, limit: int = 200) -> list[str]:
         if not self.audit_log_path.exists():
             return []
+
         def _read():
             with self.audit_log_path.open("r", encoding="utf-8") as handle:
                 lines = handle.readlines()
             return [line.rstrip("\n") for line in lines[-limit:]]
+
         return await asyncio.to_thread(_read)
