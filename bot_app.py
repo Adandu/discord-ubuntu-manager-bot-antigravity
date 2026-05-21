@@ -158,7 +158,8 @@ class ServerManagementCog(commands.Cog):
 
         try:
             items = await fetcher()
-            choices = [app_commands.Choice(name=item, value=item) for item in items if current.lower() in item.lower()]
+            current_lower = current.lower()
+            choices = [app_commands.Choice(name=item, value=item) for item in items if current_lower in item.lower()]
             return sorted(choices, key=lambda x: x.name.lower())[:25]
         except Exception as e:
             self.state.logger.error("Autocomplete error: %s", e)
