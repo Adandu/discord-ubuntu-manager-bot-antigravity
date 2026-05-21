@@ -520,7 +520,7 @@ class WebAppTests(unittest.TestCase):
             temp_dir.cleanup()
 
     @patch("ssh_manager.SSHManager.test_server_connection")
-    def test_example_server_obfuscated_credentials(self, mock_test_conn):
+    def test_example_server_obfuscated_password(self, mock_test_conn):
         temp_dir, patcher, client, state = self._build_client()
         try:
             # Add an existing server to config
@@ -533,14 +533,6 @@ class WebAppTests(unittest.TestCase):
                 port=22,
                 auth_method="password",
                 password="real_password"
-            ))
-            config.servers.append(ServerSettings(
-                alias="example_key_server",
-                host="192.0.2.22",
-                user="root",
-                port=22,
-                auth_method="key",
-                key="real_key"
             ))
             state.save_config(config)
 
@@ -580,7 +572,40 @@ class WebAppTests(unittest.TestCase):
             self.assertEqual(call_args_pwd[0]["password"], "real_password")
             self.assertEqual(call_args_pwd[0]["host"], "192.0.2.21")
 
-            mock_test_conn.reset_mock()
+        finally:
+            client.close()
+            patcher.stop()
+            temp_dir.cleanup()
+
+    @patch("ssh_manager.SSHManager.test_server_connection")
+    def test_example_server_obfuscated_key(self, mock_test_conn):
+        temp_dir, patcher, client, state = self._build_client()
+        try:
+            # Add an existing server to config
+            from models import AppConfig, ServerSettings
+            config = AppConfig.model_validate(state.config.model_dump())
+            config.servers.append(ServerSettings(
+                alias="example_key_server",
+                host="192.0.2.22",
+                user="root",
+                port=22,
+                auth_method="key",
+                key="real_key"
+            ))
+            state.save_config(config)
+
+            # Login
+            login_page = client.get("/login")
+            csrf_token = login_page.text.split('name="csrf_token" value="', 1)[1].split('"', 1)[0]
+            client.post(
+                "/login",
+                data={"password": "admin-pass", "csrf_token": csrf_token},
+                follow_redirects=False,
+            )
+            home = client.get("/")
+            authed_csrf = home.text.split('meta name="csrf-token" content="', 1)[1].split('"', 1)[0]
+
+            mock_test_conn.return_value = (True, "OK", "fp")
 
             # Test key obfuscation
             payload_key = {

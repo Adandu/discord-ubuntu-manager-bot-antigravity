@@ -100,5 +100,11 @@ class TestLoginRateLimiter(unittest.TestCase):
         self.assertTrue(limiter.is_allowed("user1"))
         self.assertFalse(limiter.is_allowed("user1"))
 
+    def test_missing_key_reset(self):
+        limiter = LoginRateLimiter(max_attempts=2, window_seconds=60)
+        # Resetting a key that has no attempts should not raise an error
+        limiter.reset("non_existent_user")
+        self.assertTrue(limiter.is_allowed("non_existent_user"))
+
 if __name__ == "__main__":
     unittest.main()

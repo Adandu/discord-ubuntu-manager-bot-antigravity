@@ -35,7 +35,7 @@ except ImportError:
 
     sys.modules['paramiko'] = paramiko_mock
 
-from ssh_manager import SSHManager
+from ssh_manager import SSHManager, _humanize_age_seconds
 
 
 class TestSSHManager(unittest.TestCase):
@@ -132,5 +132,45 @@ class TestSSHManager(unittest.TestCase):
         self.assertEqual(msg, "Connection timed out")
         self.assertIsNone(fingerprint)
 
-if __name__ == "__main__":
+
+class TestHumanizeAgeSeconds(unittest.TestCase):
+    def test_empty_strings(self):
+        """Test with empty strings and missing values."""
+        self.assertEqual(_humanize_age_seconds(""), "n/a")
+        self.assertEqual(_humanize_age_seconds("   "), "n/a")
+        self.assertEqual(_humanize_age_seconds(None), "n/a")
+
+    def test_na_strings(self):
+        """Test with 'n/a' and similar variants."""
+        self.assertEqual(_humanize_age_seconds("n/a"), "n/a")
+        self.assertEqual(_humanize_age_seconds("   n/a  "), "n/a")
+
+    def test_below_60_seconds(self):
+        """Test valid inputs below 60 seconds."""
+        self.assertEqual(_humanize_age_seconds("45"), "45s")
+        self.assertEqual(_humanize_age_seconds("45s"), "45s")
+        self.assertEqual(_humanize_age_seconds("45.5"), "45s")
+
+    def test_60_seconds_and_above(self):
+        """Test exactly 60 seconds and inputs forming complete units."""
+        self.assertEqual(_humanize_age_seconds("60"), "1m")
+        self.assertEqual(_humanize_age_seconds("60s"), "1m")
+
+    def test_multi_unit_values(self):
+        """Test multiple units (e.g., hours and minutes)."""
+        self.assertEqual(_humanize_age_seconds("3600"), "1h")
+        self.assertEqual(_humanize_age_seconds("3660"), "1h 1m")
+        self.assertEqual(_humanize_age_seconds("90000"), "1d 1h")
+        self.assertEqual(_humanize_age_seconds("86400"), "1d")
+
+    def test_trailing_s_and_spaces(self):
+        """Test inputs with trailing 's' and leading/trailing spaces."""
+        self.assertEqual(_humanize_age_seconds(" 3660s  "), "1h 1m")
+
+    def test_invalid_strings(self):
+        """Test non-numerical invalid strings return original."""
+        self.assertEqual(_humanize_age_seconds("invalid"), "invalid")
+        self.assertEqual(_humanize_age_seconds("10 days"), "10 day")
+
+if __name__ == '__main__':
     unittest.main()

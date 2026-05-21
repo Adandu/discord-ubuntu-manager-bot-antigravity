@@ -4,12 +4,30 @@ import unittest
 from types import SimpleNamespace
 
 from app_state import AppState
-from bot_app import _matches_roles, build_user_facing_error_message, check_permissions, is_allowed_log_path, is_admin
+from bot_app import _matches_roles, build_user_facing_error_message, check_permissions, is_allowed_log_path, is_admin, _role_names
 from discord import app_commands
 from models import AppConfig
 
 
 class BotPermissionTests(unittest.TestCase):
+    def test_role_names(self):
+        # 1. Missing 'roles' attribute entirely
+        user_no_roles = SimpleNamespace()
+        self.assertEqual(_role_names(user_no_roles), [])
+
+        # 2. 'roles' attribute is an empty list
+        user_empty_roles = SimpleNamespace(roles=[])
+        self.assertEqual(_role_names(user_empty_roles), [])
+
+        # 3. 'roles' attribute contains mock roles
+        user_with_roles = SimpleNamespace(
+            roles=[
+                SimpleNamespace(name="Admin"),
+                SimpleNamespace(name="Developer"),
+            ]
+        )
+        self.assertEqual(_role_names(user_with_roles), ["Admin", "Developer"])
+
     def test_matches_roles(self):
         self.assertFalse(_matches_roles(["Admin"], ""))
         self.assertFalse(_matches_roles(["Admin"], "   "))
@@ -86,6 +104,7 @@ class TestBotApp_Allowlist(unittest.IsolatedAsyncioTestCase):
     @patch("bot_app.asyncio.to_thread", new_callable=AsyncMock)
     async def test_docker_control_allowlist(self, mock_to_thread):
         state = MagicMock()
+        state.servers_by_alias = {"alpha": MagicMock(alias="alpha", allowed_containers="nginx, db"), "beta": MagicMock(alias="beta", allowed_containers="")}
         state.config.servers = [
             MagicMock(alias="alpha", allowed_containers="nginx, db"),
             MagicMock(alias="beta", allowed_containers=""),

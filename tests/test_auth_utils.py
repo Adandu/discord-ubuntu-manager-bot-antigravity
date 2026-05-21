@@ -4,6 +4,16 @@ from auth_utils import hash_password, is_password_hash, verify_password
 
 
 class AuthUtilsTests(unittest.TestCase):
+
+    def test_is_password_hash(self):
+        from auth_utils import PASSWORD_HASH_PREFIX
+        self.assertTrue(is_password_hash(f"{PASSWORD_HASH_PREFIX}$some$other$stuff"))
+        self.assertFalse(is_password_hash(f"{PASSWORD_HASH_PREFIX}"))
+        self.assertFalse(is_password_hash(f"WRONG_PREFIX$some$stuff"))
+        self.assertFalse(is_password_hash(""))
+        self.assertFalse(is_password_hash(None))
+        self.assertFalse(is_password_hash("legacy-plaintext"))
+
     def test_hash_password_creates_verifiable_hash(self):
         hashed = hash_password("super-secret")
         self.assertTrue(is_password_hash(hashed))

@@ -1,4 +1,3 @@
-from __future__ import annotations
 
 import asyncio
 import hmac
@@ -81,13 +80,7 @@ def require_api_rate_limit(request: Request, detail: str) -> None:
 
 
 def _server_config_signature(state: AppState) -> tuple:
-    return (
-        state.config.features.enable_docker,
-        tuple(
-            (server.alias, server.host, server.port, server.backup_path)
-            for server in state.config.servers
-        ),
-    )
+    return state.server_config_signature
 
 
 async def _run_cached_server_fanout(
@@ -314,14 +307,7 @@ async def test_server(request: Request, server_data: TestServerRequest):
     require_api_rate_limit(request, "Too many requests. Please wait before testing again.")
 
     server_payload = server_data.model_dump(by_alias=True)
-    original = next(
-        (
-            server
-            for server in state.config.servers
-            if server.alias == server_data.alias
-        ),
-        None,
-    )
+    original = state.servers_by_alias.get(server_data.alias)
     if original:
         server_payload["host"] = original.host
         server_payload["port"] = original.port

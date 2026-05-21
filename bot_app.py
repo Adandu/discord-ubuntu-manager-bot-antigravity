@@ -16,10 +16,10 @@ def _role_names(user) -> list[str]:
 
 
 def _matches_roles(user_roles: list[str], allowed_roles_str: str) -> bool:
-    allowed_roles = [role.strip() for role in allowed_roles_str.split(",") if role.strip()]
+    allowed_roles = {role.strip() for role in allowed_roles_str.split(",") if role.strip()}
     if not allowed_roles:
         return False
-    return any(role in allowed_roles for role in user_roles)
+    return not allowed_roles.isdisjoint(user_roles)
 
 
 def check_permissions(state: AppState, user, server_alias: str | None = None) -> bool:
@@ -158,7 +158,8 @@ class ServerManagementCog(commands.Cog):
 
         try:
             items = await fetcher()
-            choices = [app_commands.Choice(name=item, value=item) for item in items if current.lower() in item.lower()]
+            current_lower = current.lower()
+            choices = [app_commands.Choice(name=item, value=item) for item in items if current_lower in item.lower()]
             return sorted(choices, key=lambda x: x.name.lower())[:25]
         except Exception as e:
             self.state.logger.error("Autocomplete error: %s", e)
@@ -324,7 +325,7 @@ class DockerGroup(app_commands.Group, name="docker", description="Manage Docker 
         self.ensure_server_access(interaction, server)
 
         # Security check: Enforce default-deny policy for container control
-        server_config = next((s for s in self.state.config.servers if s.alias == server), None)
+        server_config = self.state.servers_by_alias.get(server)
         allowed_list = ""
         if server_config and server_config.allowed_containers.strip():
             allowed_list = server_config.allowed_containers

@@ -2,9 +2,7 @@ import base64
 from cryptography.fernet import Fernet, InvalidToken
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
-import os
 import logging
-import hashlib
 
 logger = logging.getLogger('discobunty.crypto')
 
@@ -31,11 +29,6 @@ class CryptoManager:
         key_bytes = kdf.derive(secret_key.encode())
         self.fernet = Fernet(base64.urlsafe_b64encode(key_bytes))
 
-        # Legacy key: SHA256-derived — only used to decrypt values encrypted before v2.
-        # Remove after all config files have been re-saved with the new KDF.
-        legacy_key_bytes = hashlib.sha256(secret_key.encode()).digest()
-        self._legacy_fernet = Fernet(base64.urlsafe_b64encode(legacy_key_bytes))
-
     def encrypt(self, text: str) -> str:
         if not text:
             return ""
@@ -50,14 +43,8 @@ class CryptoManager:
         try:
             return self.fernet.decrypt(encrypted_data.encode()).decode()
         except InvalidToken:
-            # Value was encrypted with the old SHA256 key — migrate transparently
-            try:
-                plaintext = self._legacy_fernet.decrypt(encrypted_data.encode()).decode()
-                logger.warning("Decrypted value using legacy SHA256 key — security upgrade required (re-save config to use PBKDF2).")
-                return plaintext
-            except Exception as e:
-                logger.error(f"Decryption failed with both primary and legacy key: {e}")
-                return text  # Return ciphertext as-is rather than crash
+            logger.error("Decryption failed: InvalidToken")
+            return text
         except Exception as e:
             logger.error(f"Decryption failed: {e}")
             return text
