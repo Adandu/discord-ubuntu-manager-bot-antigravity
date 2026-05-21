@@ -313,14 +313,7 @@ async def test_server(request: Request, server_data: TestServerRequest):
     require_api_rate_limit(request, "Too many requests. Please wait before testing again.")
 
     server_payload = server_data.model_dump(by_alias=True)
-    original = next(
-        (
-            server
-            for server in state.config.servers
-            if server.alias == server_data.alias
-        ),
-        None,
-    )
+    original = state.servers_by_alias.get(server_data.alias)
     if original:
         server_payload["host"] = original.host
         server_payload["port"] = original.port
