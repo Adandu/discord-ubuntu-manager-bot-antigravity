@@ -95,6 +95,9 @@ class AppState:
 
     def audit_log(self, user_id: int, username: str, command: str, details: str) -> None:
         timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
+        username = username.replace('\n', ' ').replace('\r', ' ')
+        command = command.replace('\n', ' ').replace('\r', ' ')
+        details = details.replace('\n', ' ').replace('\r', ' ')
         log_entry = f"[{timestamp}] USER:{user_id} ({username}) | CMD:{command} | {details}\n"
         self.audit_log_path.parent.mkdir(parents=True, exist_ok=True)
         with self.audit_log_path.open("a", encoding="utf-8") as handle:
