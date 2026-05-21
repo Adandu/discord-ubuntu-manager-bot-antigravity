@@ -7,7 +7,7 @@ import io
 import logging
 import shlex
 import time
-from typing import List, Dict, Optional, Tuple
+from typing import List, Dict, Optional, Tuple, Any
 
 logger = logging.getLogger('discobunty.ssh')
 SUDO_PROMPT_PATTERN = re.compile(r'(?m)^.*\[sudo\] password for.*$\n?|^\s*Password:\s*$\n?')
@@ -124,8 +124,10 @@ class SSHManager:
                 for key_class in [paramiko.RSAKey, paramiko.Ed25519Key, paramiko.ECDSAKey, paramiko.DSSKey]:
                     try:
                         private_key = key_class.from_private_key(io.StringIO(key_value))
-                        if private_key: break
-                    except Exception: continue
+                        if private_key:
+                            break
+                    except Exception:
+                        continue
 
                 if not private_key:
                     return "Error: Could not parse SSH key string."
@@ -138,6 +140,32 @@ class SSHManager:
             client.connect(hostname=host, port=port, username=user, password=password, timeout=10)
 
         return None
+
+
+    def _save_host_keys(self, client: paramiko.SSHClient, host: str, known_hosts_path: str, trust_host: bool) -> Optional[str]:
+        """Save host keys if trusted, returning an error message on failure."""
+        if not trust_host:
+            return None
+        try:
+            client.save_host_keys(known_hosts_path)
+            logger.info(f"Successfully added and saved host key for {host} to {known_hosts_path}")
+            return None
+        except Exception as save_err:
+            err_msg = f"Failed to save host keys to {known_hosts_path}: {save_err}"
+            logger.error(err_msg)
+            return f"Error: Connection successful but {err_msg}"
+
+    def _handle_ssh_exception(self, e: Exception, capture_policy: Any) -> Tuple[str, Optional[str]]:
+        """Process exceptions during connection and return (error_message, fingerprint)."""
+        if isinstance(e, paramiko.BadHostKeyException):
+            new_fp = "SHA256:" + base64.b64encode(hashlib.sha256(e.key.asbytes()).digest()).decode('utf-8').replace('=', '')
+            return "Host key mismatch", new_fp
+        if isinstance(e, paramiko.SSHException):
+            msg = str(e)
+            if "Host key verification failed" in msg:
+                return msg, getattr(capture_policy, 'fingerprint', None)
+            return msg, None
+        return str(e), None
 
     def _get_ssh_client(self, config: Dict, trust_host: bool = False) -> Tuple[Optional[paramiko.SSHClient], Optional[str], Optional[str]]:
         """
@@ -168,33 +196,16 @@ class SSHManager:
                 client.close()
                 return None, err, None
             
-            # Save host keys if trusted
-            if trust_host:
-                try:
-                    client.save_host_keys(known_hosts_path)
-                    logger.info(f"Successfully added and saved host key for {host} to {known_hosts_path}")
-                except Exception as save_err:
-                    err_msg = f"Failed to save host keys to {known_hosts_path}: {save_err}"
-                    logger.error(err_msg)
-                    client.close()
-                    return None, f"Error: Connection successful but {err_msg}", None
+            save_err = self._save_host_keys(client, host, known_hosts_path, trust_host)
+            if save_err:
+                client.close()
+                return None, save_err, None
 
             return client, None, None
-        except paramiko.BadHostKeyException as e:
-            client.close()
-            # Capture the new fingerprint even on mismatch for display
-            new_fp = "SHA256:" + base64.b64encode(hashlib.sha256(e.key.asbytes()).digest()).decode('utf-8').replace('=', '')
-            return None, "Host key mismatch", new_fp
-        except paramiko.SSHException as e:
-            client.close()
-            msg = str(e)
-            if "Host key verification failed" in msg:
-                # Return the captured fingerprint if available
-                return None, msg, capture_policy.fingerprint
-            return None, msg, None
         except Exception as e:
             client.close()
-            return None, str(e), None
+            msg, fingerprint = self._handle_ssh_exception(e, capture_policy)
+            return None, msg, fingerprint
 
     def test_server_connection(self, config: Dict, trust_host: bool = False) -> Tuple[bool, str, Optional[str]]:
         """Attempt to connect and return (success, message, fingerprint)."""
