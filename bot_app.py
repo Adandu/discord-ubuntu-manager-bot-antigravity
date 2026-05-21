@@ -254,7 +254,7 @@ class ServerManagementCog(commands.Cog):
     @app_commands.command(name="logs", description="View recent system log entries on a server")
     @app_commands.check(lambda interaction: check_permissions(interaction.client.state, interaction.user))
     @app_commands.autocomplete(server=server_autocomplete, path=log_autocomplete)
-    async def system_logs(self, interaction: discord.Interaction, server: str, path: str, lines: int = 20, search: str | None = None) -> None:
+    async def system_logs(self, interaction: discord.Interaction, server: str, path: str, *, lines: int = 20, search: str | None = None) -> None:
         self.ensure_server_access(interaction, server)
         await interaction.response.defer()
         real_path = await asyncio.to_thread(self.state.ssh_manager.resolve_remote_path, server, path)
@@ -353,7 +353,7 @@ class DockerGroup(app_commands.Group, name="docker", description="Manage Docker 
     @app_commands.command(name="logs", description="View container logs")
     @app_commands.check(lambda interaction: check_permissions(interaction.client.state, interaction.user))
     @app_commands.autocomplete(server=server_autocomplete, container=container_autocomplete)
-    async def docker_logs(self, interaction: discord.Interaction, server: str, container: str, lines: int = 50, search: str | None = None) -> None:
+    async def docker_logs(self, interaction: discord.Interaction, server: str, container: str, *, lines: int = 50, search: str | None = None) -> None:
         self.ensure_server_access(interaction, server)
         await interaction.response.defer()
         lines = min(max(1, lines), 100)
