@@ -64,6 +64,7 @@ class SSHManager:
         self.servers = servers
         self.servers_by_alias = {s['alias']: s for s in servers}
         self._log_cache = {} # Cache for log file lists: {alias: (timestamp, [files])}
+        self._client_pool = {} # Cache for SSH clients: {alias: paramiko.SSHClient}
 
     def update_servers(self, servers: List[Dict]) -> None:
         """Update the configured servers without destroying internal caches."""
@@ -159,6 +160,19 @@ class SSHManager:
         if not config:
             return None, "Error: Invalid server configuration.", None
 
+        alias = config.get('alias')
+        if alias and alias in self._client_pool:
+            client = self._client_pool[alias]
+            transport = client.get_transport()
+            if transport and transport.is_active():
+                return client, None, None
+            else:
+                try:
+                    client.close()
+                except Exception:
+                    pass
+                del self._client_pool[alias]
+
         host = config.get('host')
         port = int(config.get('port', 22))
 
@@ -190,11 +204,20 @@ class SSHManager:
                     client.close()
                     return None, f"Error: Connection successful but {err_msg}", None
 
+            if alias:
+                self._client_pool[alias] = client
+
             return client, None, None
         except paramiko.BadHostKeyException as e:
             client.close()
             # Capture the new fingerprint even on mismatch for display
-            new_fp = "SHA256:" + base64.b64encode(hashlib.sha256(e.key.asbytes()).digest()).decode('utf-8').replace('=', '')
+            try:
+                key_bytes = e.key.asbytes()
+                new_fp = "SHA256:" + base64.b64encode(hashlib.sha256(key_bytes).digest()).decode('utf-8').replace('=', '')
+            except AttributeError:
+                # Fallback for mocked environments or cases where e.key is not a proper paramiko PKey
+                new_fp = "SHA256:unknown"
+
             return None, "Host key mismatch", new_fp
         except paramiko.SSHException as e:
             client.close()
@@ -212,11 +235,8 @@ class SSHManager:
         client, err, fingerprint = self._get_ssh_client(config, trust_host=trust_host)
         if err:
             return False, err, fingerprint
-        try:
-            client.close()
-            return True, "✅ Connection Successful!", None
-        except Exception as e:
-            return False, f"Error closing connection: {str(e)}", None
+        # DO NOT close the client here since it's pooled
+        return True, "✅ Connection Successful!", None
 
     def execute_command(self, alias: str, command: str) -> str:
         """Connect to a server by alias and execute a command with sudo and path resolution."""
@@ -264,7 +284,7 @@ class SSHManager:
             logger.error(err_msg)
             return err_msg
         finally:
-            client.close()
+            pass  # Client is pooled, do not close
 
     def get_containers(self, alias: str) -> List[str]:
         """Fetch all container names from a server for autocomplete."""
@@ -513,4 +533,11 @@ class SSHManager:
             logger.error(err_msg)
             return err_msg
         finally:
-            client.close()
+            # We are rebooting/shutting down, the connection will drop.
+            # Evict from pool and close.
+            if alias in self._client_pool:
+                del self._client_pool[alias]
+            try:
+                client.close()
+            except Exception:
+                pass
