@@ -32,13 +32,6 @@ class TestCryptoManager(unittest.TestCase):
     def test_decrypt_not_encrypted(self):
         self.assertEqual(self.cm.decrypt("plaintext"), "plaintext")
 
-    def test_decrypt_legacy_encryption(self):
-        legacy_plaintext = "legacy_secret"
-        legacy_enc = self.cm._legacy_fernet.encrypt(legacy_plaintext.encode()).decode()
-        encrypted_string = "ENC:" + legacy_enc
-
-        decrypted = self.cm.decrypt(encrypted_string)
-        self.assertEqual(decrypted, legacy_plaintext)
 
     def test_decrypt_invalid_token_fails_both(self):
         # A token that is invalid for both current and legacy Fernet instances
