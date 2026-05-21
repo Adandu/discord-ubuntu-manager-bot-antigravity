@@ -86,6 +86,7 @@ class TestBotApp_Allowlist(unittest.IsolatedAsyncioTestCase):
     @patch("bot_app.asyncio.to_thread", new_callable=AsyncMock)
     async def test_docker_control_allowlist(self, mock_to_thread):
         state = MagicMock()
+        state.servers_by_alias = {"alpha": MagicMock(alias="alpha", allowed_containers="nginx, db"), "beta": MagicMock(alias="beta", allowed_containers="")}
         state.config.servers = [
             MagicMock(alias="alpha", allowed_containers="nginx, db"),
             MagicMock(alias="beta", allowed_containers=""),
